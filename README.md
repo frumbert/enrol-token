@@ -8,11 +8,11 @@ This plugin is a rewrite and simplification of my previous token enrolment plugi
 
 ## Screenshots
 
-[Enrolment methods](https://imgur.com/DHiCwbW)
+[Enrolment methods](https://imgur.com/DHiCwbW.jpg)
 
-[Create Tokens](https://imgur.com/ARZvRfN)
+[Create Tokens](https://imgur.com/ARZvRfN.jpg)
 
-[View & Manage Tokens](https://imgur.com/cgmgXj2)
+[View & Manage Tokens](https://imgur.com/cgmgXj2.jpg)
 
 ## Usage
 
