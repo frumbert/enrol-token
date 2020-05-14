@@ -8,11 +8,17 @@ This plugin is a rewrite and simplification of my previous token enrolment plugi
 
 ## Screenshots
 
+Creating an instance
+![Creating an instance](https://imgur.com/ZOeiggY.jpg)
+
+Enrolment methods screen icons
 ![Enrolment methods](https://imgur.com/DHiCwbW.jpg)
 
+Creating tokens
 ![Create Tokens](https://imgur.com/ARZvRfN.jpg)
 
-![View & Manage Tokens](https://imgur.com/cgmgXj2.jpg)
+View & manage tokens
+![View & manage tokens](https://imgur.com/GrzB9md.jpg)
 
 ## Usage
 
