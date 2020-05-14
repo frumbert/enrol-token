@@ -40,6 +40,8 @@ require_login($course);
 $canconfigure 	= has_capability('enrol/token:config', $context);
 $canmanage 		= has_capability('enrol/token:manage', $context);
 
+$feedback		= '';
+
 
 if (!$canconfigure and !$canmanage) {
     // No need to invent new error strings here...
@@ -80,9 +82,26 @@ if ($form->is_cancelled()) {
 	redirect($url);
 }
 
+// revoke tokens if need be
+if ((isset($_REQUEST) === true) && (isset($_REQUEST['del']) === true)) {
+	$revokeTokens = array_keys($_REQUEST['del']);
+	if ($DB->delete_records_list('enrol_token_tokens', 'id', $revokeTokens) === true) {
+
+	  $feedback = $OUTPUT->notification(get_string('tokens_revoked', 'enrol_token', (object)["count" => count($revokeTokens)]), 'notifysuccess');
+
+	} else {
+
+	 $feedback = $OUTPUT->error_text(get_string('tokens_revoked_error','enrol_token'));
+
+	}
+}
+
+
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('view_token_usage', 'enrol_token'));
 echo html_writer::tag('p', "Course: {$course->fullname}, Enrolment instance: {$instancename}");
+
+if (!empty($feedback)) echo $feedback;
 
 $form->display();
 
@@ -104,6 +123,7 @@ if (($data = $form->get_data()) !== null || $force === 1) {
 			t.seatsavailable remaining,
 			t.createdby createdby,
 			t.timecreated created,
+			t.timeexpire expires,
 			l.`userid` usedby,
 			l.`timecreated` timeused ';
 	$from = '{cohort} h
@@ -121,7 +141,7 @@ if (($data = $form->get_data()) !== null || $force === 1) {
 	} else {
 		$table = new html_table();
 		$table->id = 'viewtokenusage';
-		$table->head = [get_string('manage_token_header_token','enrol_token'),get_string('manage_token_header_cohort','enrol_token'),get_string('manage_token_header_seatsremaining','enrol_token'),get_string('manage_token_header_createdby','enrol_token'),get_string('manage_token_header_datecreated','enrol_token'),get_string('manage_token_header_usedby','enrol_token'),get_string('manage_token_header_dateused','enrol_token')];
+		$table->head = [get_string('manage_token_header_token','enrol_token'),get_string('manage_token_header_cohort','enrol_token'),get_string('manage_token_header_seatsremaining','enrol_token'),get_string('manage_token_header_createdby','enrol_token'),get_string('manage_token_header_datecreated','enrol_token'),get_string('manage_token_header_dateexpires','enrol_token'),get_string('manage_token_header_usedby','enrol_token'),get_string('manage_token_header_dateused','enrol_token'),get_string('manage_token_header_revoke','enrol_token')];
 		$rows = [];
 
 		// the problem with flexible_table is that it posts back sorting informatio via http get and we are inside a postback
@@ -149,6 +169,7 @@ if (($data = $form->get_data()) !== null || $force === 1) {
 			$dateused = $record->timeused;
 
 			$datecreated = userdate($record->created);
+			$dateexpires = (intval($record->expires) > 0) ? userdate($record->expires) : '-';
 
 			if (!is_null($usedby)) {
 				$rec = $DB->get_record('user', array('id' => $record->usedby));
@@ -160,6 +181,8 @@ if (($data = $form->get_data()) !== null || $force === 1) {
 				$dateused = userdate($dateused);
 			}
 
+			$checkbox = html_writer::checkbox("del[{$record->token}]", 1, false);
+
 			// $table->add_data([ ... ]);
 			$rows[] = [
             	$record->token,
@@ -167,13 +190,20 @@ if (($data = $form->get_data()) !== null || $force === 1) {
             	get_string('manage_token_aofb','enrol_token', (object)["a" => $record->remaining, "b" => $record->total]),
             	$usercreated,
             	$datecreated,
+            	$dateexpires,
             	$usedby,
-            	$dateused
+            	$dateused,
+            	$checkbox
             ];
 		}
 		// $table->finish_output();
 		$table->data = $rows;
-		echo html_writer::table($table);
+
+		$output = html_writer::table($table);
+		$output .= html_writer::empty_tag('input', array('type' => 'submit', 'value' => get_string('revoketokens', 'enrol_token')));
+
+		$attributes = array('method' => 'post', 'action' => new moodle_url('/enrol/token/manage.php', ["enrolid" => $enrolid]));
+		echo html_writer::tag('form', $output, $attributes);
 
 	}
 }
