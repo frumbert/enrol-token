@@ -109,7 +109,7 @@ $string['promptfiltertoken'] = 'Token search pattern';
 $string['promptfiltertoken_help'] = 'You can use <b>&#42;</b> to search for any characters (e.g. <em>token&#42;</em> will match token1, token12, token_bob, etc), and <b>?</b> to represent a single unknown character (e.g. <em>to?en</em> will match token, tojen, to6en, etc). You can use both together (e.g. <em>to?en*</em>)';
 $string['viewusers'] = 'View details';
 
-$string['create_token'] = 'Create & manage tokens';
+$string['create_token'] = 'Create tokens';
 $string['create_token_submit'] = 'Create';
 $string['create_token_tokens'] = 'Tokens';
 
