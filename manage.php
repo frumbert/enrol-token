@@ -30,6 +30,7 @@ require_once ($CFG->libdir . '/tablelib.php');
 $enrolid      	= required_param('enrolid', PARAM_INT);
 $roleid       	= optional_param('roleid', -1, PARAM_INT);
 $force 			= optional_param('execute',0,PARAM_INT);
+$download 		= optional_param('download',0,PARAM_INT);
 
 $instance 		= $DB->get_record('enrol', array('id'=>$enrolid, 'enrol'=>'token'), '*', MUST_EXIST);
 $course 		= $DB->get_record('course', array('id'=>$instance->courseid), '*', MUST_EXIST);
@@ -96,6 +97,40 @@ if ((isset($_REQUEST) === true) && (isset($_REQUEST['del']) === true)) {
 	}
 }
 
+// a basic csv downloader of all tokens
+if ($download === 1) {
+
+
+	$data = enrol_token_manager_find_tokens('*', false);
+	$fields = ['token','cohort','cohortid','total','remaining','createdby','created','expires','usedby','timeused'];
+    $exportdata = new ArrayObject($data);
+    $iterator = $exportdata->getIterator();
+
+    $filename = clean_filename('tokens');
+    \core\dataformat::download_data(
+        $filename,
+    	'csv',
+        $fields,
+	    $iterator,
+    	function($exportdata) use ($fields) {
+            $data = new stdClass();
+
+            foreach ($fields as $field) {
+                // Set data field's value from the export data's equivalent field by default.
+                $data->$field = $exportdata->$field ?? null;
+			}
+
+            $data->created = userdate($data->created);
+            $data->expires = is_null($data->expires) ? '' : userdate($data->expires);
+            $data->timeused = is_null($data->timeused) ? '' : userdate($data->timeused);
+
+			return $data;
+
+    	}
+    );
+    die();
+
+}
 
 echo $OUTPUT->header();
 echo $OUTPUT->heading(get_string('view_token_usage', 'enrol_token'));
@@ -107,39 +142,16 @@ $form->display();
 
 if (($data = $form->get_data()) !== null || $force === 1) {
 
+	if (is_null($data)) $data = new stdClass();
 	if ($force === 1) $data->token = '*';
 
-	// build SQL statement from given options
-	$where = '';
-	if ($data->token != '') $where = "WHERE t.id LIKE ?";
+	$data = enrol_token_manager_find_tokens($data->token);
 
-	// get_records_sql uses the first column as the key and discards duplicate keys ... so we have to ensure the first column is a unique value
-	// see https://stackoverflow.com/a/55866244/1238884
-	$fields = 'ROW_NUMBER() OVER (),
-			t.id token,
-			h.name cohort,
-			h.id cohortid,
-			t.numseats total,
-			t.seatsavailable remaining,
-			t.createdby createdby,
-			t.timecreated created,
-			t.timeexpire expires,
-			l.`userid` usedby,
-			l.`timecreated` timeused ';
-	$from = '{cohort} h
-		inner join {enrol_token_tokens} t on t.`cohortid` = h.`id`
-		left outer join {enrol_token_log} l on t.id = l.`token`
-	';
-	$order = 't.timecreated desc,
-			l.timecreated desc';
-
-    // echo "SELECT {$fields} FROM {$from} {$where} ORDER BY {$order} ";
-
-	$data = $DB->get_records_sql("SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}", [str_replace(['*', '?', ';'], ['%', '_', ''], $data->token)]);
 	if (count($data) === 0) {
 		echo $OUTPUT->error_text('No records');
 	} else {
 		$table = new html_table();
+		$table->downloadable = true;
 		$table->id = 'viewtokenusage';
 		$table->head = [get_string('manage_token_header_token','enrol_token'),get_string('manage_token_header_cohort','enrol_token'),get_string('manage_token_header_seatsremaining','enrol_token'),get_string('manage_token_header_createdby','enrol_token'),get_string('manage_token_header_datecreated','enrol_token'),get_string('manage_token_header_dateexpires','enrol_token'),get_string('manage_token_header_usedby','enrol_token'),get_string('manage_token_header_dateused','enrol_token'),get_string('manage_token_header_revoke','enrol_token')];
 		$rows = [];
@@ -200,18 +212,20 @@ if (($data = $form->get_data()) !== null || $force === 1) {
 		$table->data = $rows;
 
 		$output = html_writer::table($table);
-		$output .= html_writer::empty_tag('input', array('type' => 'submit', 'value' => get_string('revoketokens', 'enrol_token')));
+		$output .= html_writer::empty_tag('input', array('type' => 'submit', 'value' => get_string('revoketokens', 'enrol_token'), 'class' => 'btn btn-warning'));
 
 		$attributes = array('method' => 'post', 'action' => new moodle_url('/enrol/token/manage.php', ["enrolid" => $enrolid]));
 		echo html_writer::tag('form', $output, $attributes);
+
+		echo html_writer::empty_tag('br');
+
+		echo html_writer::link(new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid, 'execute' => 1, 'download' => 1]), html_writer::tag('button', get_string('downloadtext'), ['class' => 'btn btn-secondary']));
 
 	}
 }
 
 
 echo $OUTPUT->footer();
-
-
 /* ------------------------------------------------------------------------------------- */
 
 

@@ -303,3 +303,36 @@ function enrol_token_manager_create_tokens_external($course_idnumber, $num_seats
     // return the tokens
     return $tokens;
 }
+
+function enrol_token_manager_find_tokens($filter = '*', $include_row = true) {
+    global $DB;
+    // build SQL statement from given options
+    $where = '';
+    if ($filter != '') $where = "WHERE t.id LIKE ?";
+
+    // get_records_sql uses the first column as the key and discards duplicate keys ... so we have to ensure the first column is a unique value
+    // see https://stackoverflow.com/a/55866244/1238884
+    $fields = '
+            t.id token,
+            h.name cohort,
+            h.id cohortid,
+            t.numseats total,
+            t.seatsavailable remaining,
+            t.createdby createdby,
+            t.timecreated created,
+            t.timeexpire expires,
+            l.`userid` usedby,
+            l.`timecreated` timeused ';
+    $from = '{cohort} h
+        inner join {enrol_token_tokens} t on t.`cohortid` = h.`id`
+        left outer join {enrol_token_log} l on t.id = l.`token`
+    ';
+    $order = 't.timecreated desc,
+            l.timecreated desc';
+
+    if ($include_row) {
+        $fields = 'ROW_NUMBER() OVER (), ' . $fields;
+    }
+
+    return $DB->get_records_sql("SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}", [str_replace(['*', '?', ';'], ['%', '_', ''], $filter)]);
+}
