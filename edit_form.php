@@ -62,7 +62,8 @@ class enrol_token_edit_form extends moodleform
         $mform->addHelpButton('customint6', 'newenrols', 'enrol_token');
         $mform->disabledIf('customint6', 'status', 'eq', ENROL_INSTANCE_DISABLED);
 
-        $roles = $this->extend_assignable_roles($context, $instance->roleid);
+        $roles = $this->extend_assignable_roles($context, $instance->roleid, 5);
+        $mform->setDefault('roleid', 0);
         $mform->addElement('select', 'roleid', get_string('role', 'enrol_token'), $roles);
 
         $mform->addElement('duration', 'enrolperiod', get_string('enrolperiod', 'enrol_token'), array('optional' => true, 'defaultunit' => 86400));
