@@ -120,8 +120,9 @@ if (($data = $form->get_data()) === null) {
 		array_map(function($k){ return '{'.$k.'}'; }, array_keys($array)),
 		$array
 	);
-
-	$messagehtml = str_replace(array_keys($array), $array, format_text($data->mailbody));
+	$messagehtml = format_text($data->mailbody['text']);
+	unset($array['{mailbody}']);
+	$messagehtml = str_replace(array_keys($array), array_values($array), $messagehtml);
 	$messagetext = html_to_text($messagehtml, 75, false);
 
 	// queue email for sending if required
@@ -151,6 +152,9 @@ if (($data = $form->get_data()) === null) {
 
 
 		// if email fails to send - warn token creating user on screen
+		// function email_to_user($user, $from, $subject, $messagetext, $messagehtml = '', $attachment = '', $attachname = '',
+        //                $usetrueaddress = true, $replyto = '', $replytoname = '', $wordwrapwidth = 79) {
+
 		if (email_to_user($fakeUser, core_user::get_support_user(), $data->mailsubject, $messagetext, $messagehtml) === false) {
 			$feedback = $OUTPUT->error_text('Warning - there was a problem automatcially emailing the token code(s).');
 		}
