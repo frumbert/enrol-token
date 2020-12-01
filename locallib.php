@@ -331,7 +331,13 @@ function enrol_token_manager_find_tokens($filter = '*', $include_row = true) {
             l.timecreated desc';
 
     if ($include_row) {
-        $fields = 'ROW_NUMBER() OVER (), ' . $fields;
+        // this window function requires mariadb 10.2 or higher
+        // https://stackoverflow.com/a/57766055/1238884
+        // $fields = 'ROW_NUMBER() OVER (), ' . $fields;
+
+        // whereas this alternate seems to be fine
+        $fields = '@row_num:= @row_num + 1, ' . $fields;
+        $from .= ', (select @row_num:=0 as num) as c';
     }
 
     return $DB->get_records_sql("SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}", [str_replace(['*', '?', ';'], ['%', '_', ''], $filter)]);
