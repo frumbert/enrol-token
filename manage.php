@@ -27,13 +27,27 @@ require_once ($CFG->dirroot.'/enrol/token/locallib.php');
 require_once ($CFG->libdir . '/formslib.php');
 require_once ($CFG->libdir . '/tablelib.php');
 
-$enrolid      	= required_param('enrolid', PARAM_INT);
-$roleid       	= optional_param('roleid', -1, PARAM_INT);
+$enrolid      	= optional_param('enrolid',0,PARAM_INT);
 $force 			= optional_param('execute',0,PARAM_INT);
 $download 		= optional_param('download',0,PARAM_INT);
+$courseid 		= optional_param('courseid',0,PARAM_INT);
 
-$instance 		= $DB->get_record('enrol', array('id'=>$enrolid, 'enrol'=>'token'), '*', MUST_EXIST);
-$course 		= $DB->get_record('course', array('id'=>$instance->courseid), '*', MUST_EXIST);
+if ($courseid > 0) { // look up using a course
+
+	$course 		= $DB->get_record('course', array('id' => $courseid), '*', MUST_EXIST);
+	$instance 		= $DB->get_record('enrol', array('enrol' => 'token', 'courseid' => $course->id), '*', MUST_EXIST);
+	$enrolid 		= $instance->id;
+
+} else if ($enrolid > 0) { // look up using an enrolment instance
+
+	$instance 		= $DB->get_record('enrol', array('id'=>$enrolid, 'enrol'=>'token'), '*', MUST_EXIST);
+	$course 		= $DB->get_record('course', array('id'=>$instance->courseid), '*', MUST_EXIST);
+
+} else { // unsupported use
+
+	throw new moodle_exception('invalidaction');
+
+}
 $context 		= context_course::instance($course->id, MUST_EXIST);
 
 require_login($course);
