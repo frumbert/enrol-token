@@ -289,7 +289,15 @@ class enrol_token_plugin extends enrol_plugin
         return null;
     }
 
-    // checks that token is enrolable and enrols user
+    /**
+     * checks that token is enrolable and enrols user
+     * assumes that $USER and $SESSION are set up correctly - so enrols the current user (you can't specify one)
+     *
+     * @param string tokenValue containing token value
+     * @param integer courseId  course that the token is for; will be set (byref)
+     * @param string returnToUrl url to set WantsUrl for post-enrolment redirect
+     * @return mixed true if successful, numerical error code if not
+     */
     public function doEnrolment($tokenValue, &$courseId, $returnToUrl = null) {
         global $DB, $USER, $SESSION, $CFG;
 
@@ -377,6 +385,66 @@ class enrol_token_plugin extends enrol_plugin
 
         // return SUCCESS
 
+
+    }
+
+   /**
+     * assumes that the token and course is set up and is valid (i.e. has been checked, has seats remaining, etc)
+     *
+     * @param string tokenValue containing token value
+     * @param user user user record
+     * @return boolean true if enrolment was a success, false if not
+     */
+ 
+    public function perform_trusted_enrolment($token, $user) {
+        global $DB;
+
+        // set up objects we require
+        $tokenRec = $DB->get_record('enrol_token_tokens', array('id' => $token), 'courseid,seatsavailable,timeexpire,cohortid');
+        $courseId = $tokenRec->courseid;
+
+        $settings = ($tokenRec === false) ? $this->getDefaultValuesAsObject() : $this->getInstanceDataForCourse($courseId);
+        $cohortid = $tokenRec->cohortid;
+
+        // user already enrolled in course? return SUCCESS
+        if (is_enrolled(context_course::instance($courseId), $user, '', true) === true) return true;
+
+        // if an enrolment period has been defined, set it for this enrolment
+        $timestart = time();
+        $timeend = ($settings->enrolperiod) ? ($timestart + $settings->enrolperiod) : 0;
+
+        // start db transaction that can be rolled back if any issues
+        if (($transaction = $DB->start_delegated_transaction()) === null) throw new coding_exception('Invalid delegated transaction object');
+
+        try {
+
+            // enrol the user in the course
+            $this->enrol_user($settings, $user->id, $settings->roleid, $timestart, $timeend);
+
+            // add the user to the cohort for this enrolment (cohort/lib.php)
+            cohort_add_member($cohortid, $user->id);
+
+            // record this token enrolment for this user so we have an easy track of its usage
+            $this->record_token($user->id, $token);
+
+            // decrement the seats available on the token
+            $tokenRec->seatsavailable--;
+
+            // update the token's persistent store record with the new seatsavailable value
+            $tokenRec->id = $token;
+
+            // update token record, on failure to update throw exception to force a rollback
+            if ($DB->execute("UPDATE {enrol_token_tokens} SET seatsavailable = (seatsavailable - 1) WHERE id = '{$token}' AND seatsavailable > 0") === false) throw new Exception('', -5150);
+
+            // commit the transaction
+            $transaction->allow_commit();
+        }
+        catch(Exception $e) {
+            $transaction->rollback($e);
+            return false;
+        }
+
+        return true;
 
     }
 
