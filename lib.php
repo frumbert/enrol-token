@@ -309,14 +309,17 @@ class enrol_token_plugin extends enrol_plugin
 
         // map crappy customint field names to descriptive field names
         if (isset($settings->ipthrottlingperiod) === false) $settings->ipthrottlingperiod = $settings->customint1;
-
         if (isset($settings->userthrottlingperiod) === false) $settings->userthrottlingperiod = $settings->customint3;
 
         // check if ip address or user is throttled from entering tokens
-        if ($this->isThrottled($tokenValue, $settings, $USER->id) === true) return 1;
+        if ($this->isThrottled($tokenValue, $settings, $USER->id) === true) {
+            return 1;
+        }
 
         // did token record exist? - this has to be checked *after* throttling is taken care of
-        if ($tokenRec === false) return 2;
+        if ($tokenRec === false) {
+            return 2;
+        }
 
         // things we need
         $courseId = $tokenRec->courseid;
@@ -324,20 +327,29 @@ class enrol_token_plugin extends enrol_plugin
 
         // ensure course is enrollable using token
         $retVal = $this->isEnrolable($settings);
-        if ($retVal != true) return (10 + $retVal);
+        if ($retVal != true) {
+            return (10 + $retVal);
+        }
 
         // user already enrolled in course? return SUCCESS
-        if ((isloggedin() === true) && (is_enrolled(context_course::instance($tokenRec->courseid), $USER, '', true) === true)) return true;
+        var_dump('token rec course ' . $tokenRec->courseid);
+        if ((isloggedin() === true) && (is_enrolled(context_course::instance($tokenRec->courseid), $USER, '', true) === true)) {
+            return true;
+        }
 
         // require user login at this point
         $SESSION->wantsurl = $returnToUrl;
         require_login(null, false, null, ($returnToUrl === null));
 
         // are seats available on token?
-        if ($tokenRec->seatsavailable <= 0) return 3;
+        if ($tokenRec->seatsavailable <= 0) {
+            return 3;
+        }
 
         // has token expired?
-        if (($tokenRec->timeexpire != 0) && ($tokenRec->timeexpire < time())) return 4;
+        if (($tokenRec->timeexpire != 0) && ($tokenRec->timeexpire < time())) {
+            return 4;
+        }
 
         // if an enrolment period has been defined, set it for this enrolment
         $timestart = time();
@@ -373,7 +385,9 @@ class enrol_token_plugin extends enrol_plugin
             $transaction->rollback($e);
 
             // if token got used up between first check and our update, return same error value as previous 'no seats available' error
-            if ($e->code == -5150) return 3;
+            if ($e->code == -5150) {
+                return 3;
+            }
 
             return 5;
         }
