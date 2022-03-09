@@ -57,23 +57,22 @@ $canmanage 		= has_capability('enrol/token:manage', $context);
 
 $feedback		= '';
 
-
 if (!$canconfigure and !$canmanage) {
     // No need to invent new error strings here...
     require_capability('enrol/token:config', $context);
     require_capability('enrol/token:manage', $context);
 }
 
-if ($roleid < 0) {
-    $roleid = $instance->roleid;
-}
+// if ($roleid < 0) {
+//     $roleid = $instance->roleid;
+// }
 $roles = get_assignable_roles($context);
 $roles = array('0'=>get_string('none')) + $roles;
 
-if (!isset($roles[$roleid])) {
-    // Weird - security always first!
-    $roleid = 0;
-}
+// if (!isset($roles[$roleid])) {
+//     // Weird - security always first!
+//     $roleid = 0;
+// }
 
 if (!$enrol_token = enrol_get_plugin('token')) {
     throw new coding_exception('Can not instantiate enrol_token');
@@ -102,11 +101,11 @@ if ((isset($_REQUEST) === true) && (isset($_REQUEST['del']) === true)) {
 	$revokeTokens = array_keys($_REQUEST['del']);
 	if ($DB->delete_records_list('enrol_token_tokens', 'id', $revokeTokens) === true) {
 
-	  $feedback = $OUTPUT->notification(get_string('tokens_revoked', 'enrol_token', (object)["count" => count($revokeTokens)]), 'notifysuccess');
+		$feedback = $OUTPUT->notification(get_string('tokens_revoked', 'enrol_token', (object)["count" => count($revokeTokens)]), 'notifysuccess');
 
 	} else {
 
-	 $feedback = $OUTPUT->error_text(get_string('tokens_revoked_error','enrol_token'));
+		$feedback = $OUTPUT->error_text(get_string('tokens_revoked_error','enrol_token'));
 
 	}
 }
@@ -114,8 +113,7 @@ if ((isset($_REQUEST) === true) && (isset($_REQUEST['del']) === true)) {
 // a basic csv downloader of all tokens
 if ($download === 1) {
 
-
-	$data = enrol_token_manager_find_tokens('*', false);
+	$data = enrol_token_manager_find_tokens($instance, '*', false);
 	$fields = ['token','cohort','cohortid','total','remaining','createdby','created','expires','usedby','timeused'];
     $exportdata = new ArrayObject($data);
     $iterator = $exportdata->getIterator();
@@ -159,7 +157,7 @@ if (($data = $form->get_data()) !== null || $force === 1) {
 	if (is_null($data)) $data = new stdClass();
 	if ($force === 1) $data->token = '*';
 
-	$data = enrol_token_manager_find_tokens($data->token);
+	$data = enrol_token_manager_find_tokens($instance, $data->token, );
 
 	if (count($data) === 0) {
 		echo $OUTPUT->error_text('No records');
