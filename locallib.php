@@ -304,11 +304,24 @@ function enrol_token_manager_create_tokens_external($course_idnumber, $num_seats
     return $tokens;
 }
 
-function enrol_token_manager_find_tokens($filter = '*', $include_row = true) {
+/**
+ * Finds one or more tokens and their usage details based on a filter
+ * @param int $istance Enrolment instance 
+ * @param string $filter like query to search for
+ * @param boolean $include_row whether to populate a row-number column
+ * @return $DB rows
+ */
+function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row = true) {
     global $DB;
+
     // build SQL statement from given options
-    $where = '';
-    if ($filter != '') $where = "WHERE t.id LIKE ?";
+    $query = ['t.courseid = ?'];
+    $params = [(int)$instance->courseid];
+    if ($filter != '') {
+        $query[] = 't.id LIKE ?';
+        $params[] = str_replace(['*', '?'], ['%', '_'], $filter);
+    }
+    $where = "WHERE " . implode(' AND ', $query);
 
     // get_records_sql uses the first column as the key and discards duplicate keys ... so we have to ensure the first column is a unique value
     // see https://stackoverflow.com/a/55866244/1238884
@@ -330,6 +343,7 @@ function enrol_token_manager_find_tokens($filter = '*', $include_row = true) {
     $order = 't.timecreated desc,
             l.timecreated desc';
 
+    // the recordset's id column is text (the token key); we might need a numeric id column, so create one
     if ($include_row) {
         // this window function requires mariadb 10.2 or higher
         // https://stackoverflow.com/a/57766055/1238884
@@ -340,5 +354,5 @@ function enrol_token_manager_find_tokens($filter = '*', $include_row = true) {
         $from .= ', (select @row_num:=0 as num) as c';
     }
 
-    return $DB->get_records_sql("SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}", [str_replace(['*', '?', ';'], ['%', '_', ''], $filter)]);
+    return $DB->get_records_sql("SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}", $params);
 }
