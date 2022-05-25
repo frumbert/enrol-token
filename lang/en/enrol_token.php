@@ -179,3 +179,17 @@ $string['manage_token_header_usedby'] = 'Used by';
 $string['manage_token_header_dateused'] = 'Date used';
 $string['manage_token_header_revoke'] = 'Delete';
 $string['manage_token_aofb'] = '{$a->a} of {$a->b}';
+$string['manage_token_header_action'] = 'Action';
+
+$string['manage_token_header_edit'] = 'Edit token: <code>{$a}</code>';
+$string['manage_token_action_edit'] = 'Edit';
+$string['manage_token_action_seats'] = 'Seats available';
+$string['manage_token_action_remaining'] = 'Seats remaining';
+$string['manage_token_action_expires'] = 'Expiry date';
+
+$string['seatslessthanavailable'] = 'The number of seats remaining is greater than the number of seats available';
+$string['seatsoutofrange'] = 'Seats must be between 1 and {$a}';
+$string['tokensoutofrange'] = 'The number of tokens you entered must be between 1 and {$a} and must be equal or less than the number of seats available';
+$string['expirydateinvalid'] = 'The expiry date must be in the future';
+
+$string['token_value'] = 'Token: {$a}';

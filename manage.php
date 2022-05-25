@@ -28,6 +28,7 @@ require_once ($CFG->libdir . '/formslib.php');
 require_once ($CFG->libdir . '/tablelib.php');
 
 $enrolid      	= optional_param('enrolid',0,PARAM_INT);
+// $roleid       	= optional_param('roleid', -1, PARAM_INT);
 $force 			= optional_param('execute',0,PARAM_INT);
 $download 		= optional_param('download',0,PARAM_INT);
 $courseid 		= optional_param('courseid',0,PARAM_INT);
@@ -57,6 +58,10 @@ $canmanage 		= has_capability('enrol/token:manage', $context);
 
 $feedback		= '';
 
+$edit = optional_param('edit', false, PARAM_BOOL);
+$token = optional_param('token', '', PARAM_TEXT);
+$editing = ($edit && confirm_sesskey());
+
 if (!$canconfigure and !$canmanage) {
     // No need to invent new error strings here...
     require_capability('enrol/token:config', $context);
@@ -85,27 +90,58 @@ $PAGE->set_pagelayout('admin');
 $PAGE->set_title($enrol_token->get_instance_name($instance));
 $PAGE->set_heading($course->fullname);
 
-navigation_node::override_active_url(new moodle_url('/user/index.php', array('id'=>$course->id)));
+// so when you cancel you go back to the enrolment instances screen
+navigation_node::override_active_url(new moodle_url('/enrol/instances.php', array('id'=>$instance->id)));
 
 // initialise the form using the enrolid so it works after postback
 $url = new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid]);
 $form = new view_enrol_token_usage_form($url);
+
+
+if ($editing) {
+	$form->set_data(['token' => $token]);
+	$token_row = $DB->get_record('enrol_token_tokens', array('id'=>$token), '*', MUST_EXIST);
+	$editform = new modify_token_form(null, [
+		'enrolid'=>$enrolid,
+		'token'=>$token,
+		'seats'=>$token_row->numseats,
+		'remaining'=>$token_row->seatsavailable,
+		'expires'=>$token_row->timeexpire,
+	]);
+
+	if ($editform->is_cancelled()) {
+		$url = new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid]);
+		redirect($url);
+
+	} else if (($data = $editform->get_data()) !== null) {
+
+		$token_row->numseats = $data->seats;
+		$token_row->seatsavailable = $data->available;
+		$token_row->timeexpire = $data->expires ?: 0;
+		//var_dump($data,$token_row);exit;
+		$DB->update_record('enrol_token_tokens', $token_row);
+		$editing = false;
+
+	}
+}
+
 
 if ($form->is_cancelled()) {
 	$url = new moodle_url('/enrol/instances.php', ['id' => $course->id]);
 	redirect($url);
 }
 
+
 // revoke tokens if need be
 if ((isset($_REQUEST) === true) && (isset($_REQUEST['del']) === true)) {
 	$revokeTokens = array_keys($_REQUEST['del']);
 	if ($DB->delete_records_list('enrol_token_tokens', 'id', $revokeTokens) === true) {
 
-		$feedback = $OUTPUT->notification(get_string('tokens_revoked', 'enrol_token', (object)["count" => count($revokeTokens)]), 'notifysuccess');
+	  $feedback = $OUTPUT->notification(get_string('tokens_revoked', 'enrol_token', (object)["count" => count($revokeTokens)]), 'notifysuccess');
 
 	} else {
 
-		$feedback = $OUTPUT->error_text(get_string('tokens_revoked_error','enrol_token'));
+	 $feedback = $OUTPUT->error_text(get_string('tokens_revoked_error','enrol_token'));
 
 	}
 }
@@ -150,92 +186,114 @@ echo html_writer::tag('p', "Course: {$course->fullname}, Enrolment instance: {$i
 
 if (!empty($feedback)) echo $feedback;
 
-$form->display();
+if ($editing) {
 
-if (($data = $form->get_data()) !== null || $force === 1) {
+	$editform->display();
 
-	if (is_null($data)) $data = new stdClass();
-	if ($force === 1) $data->token = '*';
+} else {
 
-	$data = enrol_token_manager_find_tokens($instance, $data->token, );
+	$form->display();
 
-	if (count($data) === 0) {
-		echo $OUTPUT->error_text('No records');
-	} else {
-		$table = new html_table();
-		$table->downloadable = true;
-		$table->id = 'viewtokenusage';
-		$table->head = [get_string('manage_token_header_token','enrol_token'),get_string('manage_token_header_cohort','enrol_token'),get_string('manage_token_header_seatsremaining','enrol_token'),get_string('manage_token_header_createdby','enrol_token'),get_string('manage_token_header_datecreated','enrol_token'),get_string('manage_token_header_dateexpires','enrol_token'),get_string('manage_token_header_usedby','enrol_token'),get_string('manage_token_header_dateused','enrol_token'),get_string('manage_token_header_revoke','enrol_token')];
-		$rows = [];
+	if (($data = $form->get_data()) !== null || $force === 1) {
 
-		// the problem with flexible_table is that it posts back sorting informatio via http get and we are inside a postback
-		// $table = new \flexible_table('enrol_token_manage');
-		// $table->define_columns(['token','cohort','remaining','creator','created','usedby','usedon']);
-		// $table->define_headers([get_string('manage_token_header_token','enrol_token'),get_string('manage_token_header_cohort','enrol_token'),get_string('manage_token_header_seatsremaining','enrol_token'),get_string('manage_token_header_createdby','enrol_token'),get_string('manage_token_header_datecreated','enrol_token'),get_string('manage_token_header_usedby','enrol_token'),get_string('manage_token_header_dateused','enrol_token')]);
-		// $table->define_baseurl($PAGE->url);
-		// $table->sortable(true);
-		// $table->collapsible(true);
-		// $table->no_sorting('remaining');
-		// $table->no_sorting('cohort');
-		// $table->setup();
+		if (is_null($data)) $data = new stdClass();
+		if ($force === 1) $data->token = '*';
 
-		foreach ($data as $record) {
+		$data = enrol_token_manager_find_tokens($instance, $data->token);
 
-			// var_dump($record);
+		if (count($data) === 0) {
+			echo $OUTPUT->error_text('No records');
+		} else {
+			$table = new html_table();
+			$table->downloadable = true;
+			$table->id = 'viewtokenusage';
+			$table->head = [
+				get_string('manage_token_header_token','enrol_token'),
+				get_string('manage_token_header_cohort','enrol_token'),
+				get_string('manage_token_header_seatsremaining','enrol_token'),
+				get_string('manage_token_header_createdby','enrol_token'),
+				get_string('manage_token_header_datecreated','enrol_token'),
+				get_string('manage_token_header_dateexpires','enrol_token'),
+				get_string('manage_token_header_usedby','enrol_token'),
+				// get_string('manage_token_header_dateused','enrol_token'),
+				get_string('manage_token_header_action','enrol_token'),
+				get_string('manage_token_header_revoke','enrol_token')];
+			$rows = [];
 
-			$url = new \moodle_url('/cohort/assign.php', array('id' => $record->cohortid, 'returnurl' => '%2Fcohort%2Findex.php%3Fpage%3D0'));
-			$cohort = \html_writer::link($url, $record->cohort);
+			// the problem with flexible_table is that it posts back sorting informatio via http get and we are inside a postback
+			// $table = new \flexible_table('enrol_token_manage');
+			// $table->define_columns(['token','cohort','remaining','creator','created','usedby','usedon']);
+			// $table->define_headers([get_string('manage_token_header_token','enrol_token'),get_string('manage_token_header_cohort','enrol_token'),get_string('manage_token_header_seatsremaining','enrol_token'),get_string('manage_token_header_createdby','enrol_token'),get_string('manage_token_header_datecreated','enrol_token'),get_string('manage_token_header_usedby','enrol_token'),get_string('manage_token_header_dateused','enrol_token')]);
+			// $table->define_baseurl($PAGE->url);
+			// $table->sortable(true);
+			// $table->collapsible(true);
+			// $table->no_sorting('remaining');
+			// $table->no_sorting('cohort');
+			// $table->setup();
 
-			$rec = $DB->get_record('user', array('id' => $record->createdby));
-			$url = new \moodle_url('/user/view.php', array('id' => $record->createdby, 'course' => $course->id));
-			$usercreated = \html_writer::link($url, fullname($rec));
-			$usedby = $record->usedby;
-			$dateused = $record->timeused;
+			foreach ($data as $record) {
 
-			$datecreated = userdate($record->created);
-			$dateexpires = (intval($record->expires) > 0) ? userdate($record->expires) : '-';
+				// var_dump($record);
 
-			if (!is_null($usedby)) {
-				$rec = $DB->get_record('user', array('id' => $record->usedby));
-				$url = new \moodle_url('/user/view.php', array('id' => $record->usedby, 'course' => $course->id));
-				$usedby = \html_writer::link($url, fullname($rec));
+				$url = new \moodle_url('/cohort/assign.php', array('id' => $record->cohortid, 'returnurl' => '%2Fcohort%2Findex.php%3Fpage%3D0'));
+				$cohort = \html_writer::link($url, $record->cohort);
+
+				$rec = $DB->get_record('user', array('id' => $record->createdby));
+				$url = new \moodle_url('/user/view.php', array('id' => $record->createdby, 'course' => $course->id));
+				$usercreated = \html_writer::link($url, fullname($rec));
+				$usedby = enrol_token_get_token_users_list($record->token, $record->courseid);
+				// $dateused = $record->timeused;
+
+				$datecreated = userdate($record->created);
+				$dateexpires = (intval($record->expires) > 0) ? userdate($record->expires) : '-';
+
+				// if (!is_null($usedby)) {
+				// 	$rec = $DB->get_record('user', array('id' => $record->usedby));
+				// 	$url = new \moodle_url('/user/view.php', array('id' => $record->usedby, 'course' => $course->id));
+				// 	$usedby = \html_writer::link($url, fullname($rec));
+				// }
+
+				// if (!is_null($dateused)) {
+				// 	$dateused = userdate($dateused);
+				// }
+
+				$action = html_writer::link(
+					new \moodle_url('/enrol/token/manage.php', array('enrolid' => $enrolid, 'token' => $record->token, 'edit' => true, 'sesskey' => sesskey())),
+					get_string('manage_token_action_edit', 'enrol_token')
+				);
+
+				$checkbox = html_writer::checkbox("del[{$record->token}]", 1, false);
+
+				// $table->add_data([ ... ]);
+				$rows[] = [
+					$record->token,
+					$cohort,
+					get_string('manage_token_aofb','enrol_token', (object)["a" => $record->remaining, "b" => $record->total]),
+					$usercreated,
+					$datecreated,
+					$dateexpires,
+					$usedby,
+					// $dateused,
+					$action,
+					$checkbox
+				];
 			}
+			// $table->finish_output();
+			$table->data = $rows;
 
-			if (!is_null($dateused)) {
-				$dateused = userdate($dateused);
-			}
+			$output = html_writer::table($table);
+			$output .= html_writer::empty_tag('input', array('type' => 'submit', 'value' => get_string('revoketokens', 'enrol_token'), 'class' => 'btn btn-warning'));
 
-			$checkbox = html_writer::checkbox("del[{$record->token}]", 1, false);
+			$attributes = array('method' => 'post', 'action' => new moodle_url('/enrol/token/manage.php', ["enrolid" => $enrolid]));
+			echo html_writer::tag('form', $output, $attributes);
 
-			// $table->add_data([ ... ]);
-			$rows[] = [
-            	$record->token,
-            	$cohort,
-            	get_string('manage_token_aofb','enrol_token', (object)["a" => $record->remaining, "b" => $record->total]),
-            	$usercreated,
-            	$datecreated,
-            	$dateexpires,
-            	$usedby,
-            	$dateused,
-            	$checkbox
-            ];
+			echo html_writer::empty_tag('br');
+
+			echo html_writer::link(new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid, 'execute' => 1, 'download' => 1]), html_writer::tag('button', get_string('downloadtext'), ['class' => 'btn btn-secondary']));
+
 		}
-		// $table->finish_output();
-		$table->data = $rows;
-
-		$output = html_writer::table($table);
-		$output .= html_writer::empty_tag('input', array('type' => 'submit', 'value' => get_string('revoketokens', 'enrol_token'), 'class' => 'btn btn-warning'));
-
-		$attributes = array('method' => 'post', 'action' => new moodle_url('/enrol/token/manage.php', ["enrolid" => $enrolid]));
-		echo html_writer::tag('form', $output, $attributes);
-
-		echo html_writer::empty_tag('br');
-
-		echo html_writer::link(new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid, 'execute' => 1, 'download' => 1]), html_writer::tag('button', get_string('downloadtext'), ['class' => 'btn btn-secondary']));
-
 	}
 }
-
 
 echo $OUTPUT->footer();
 /* ------------------------------------------------------------------------------------- */

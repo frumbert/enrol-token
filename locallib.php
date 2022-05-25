@@ -26,7 +26,7 @@
  */
 
 defined('MOODLE_INTERNAL') || die();
-
+define('MAX_SEATS', 1000);
 require_once ("$CFG->libdir/formslib.php");
 
 // used on the manage.php page
@@ -105,6 +105,92 @@ class enrol_token_enrol_form extends moodleform
     }
 }
 
+class modify_token_form extends moodleform {
+    protected $instance;
+
+    // protected function get_form_identifier() {
+    //     $formid = $this->_customdata->id . '_' . get_class($this);
+    //     return $formid;
+    // }
+
+    public function definition() {
+        $mform = $this->_form;
+        $instance = $this->_customdata;
+        $this->instance = $instance;
+
+        // debugging
+        // $mform->addElement('html', '<pre>'.print_r($instance,true).'</pre>');
+
+        $mform->addElement('html', '<div id="token-edit-area">');
+
+        $mform->addElement('html', '<h3>' . get_string('manage_token_header_edit', 'enrol_token', $instance['token']) . '</h3>');
+        // $mform->addElement('html', '<p>' . get_string('token_value', 'enrol_token', $instance['token']) . '</p>');
+
+        $mform->setType('enroltoken', PARAM_ALPHANUMEXT);
+
+        // seats total
+        $mform->addElement('text', 'seats', get_string('manage_token_action_seats', 'enrol_token'), 'maxlength="4" size="5"');
+        $mform->addHelpButton('seats', 'create_token_count', 'enrol_token');
+        $mform->setDefault('seats', $instance['seats']);
+        $mform->setType('seats', PARAM_INT);
+        $mform->addRule('seats', 'Enter a number between 1 and 1000', 'regex', '/^0*(?:[1-9][0-9][0-9]?|[1-9]|1000)$/', 'client', false, false );
+
+        // seats remaining
+        $mform->addElement('text', 'available', get_string('manage_token_action_remaining', 'enrol_token'), 'maxlength="4" size="5"');
+        $mform->addHelpButton('available', 'create_token_seats', 'enrol_token');
+        $mform->setDefault('available', $instance['remaining']);
+        $mform->setType('available', PARAM_INT);
+        $mform->addRule('available', 'Enter a number between 1 and 1000', 'regex', '/^0*(?:[1-9][0-9][0-9]?|[1-9]|1000)$/', 'client', false, false );
+
+        // time expires
+        $mform->addElement('date_time_selector', 'expires', get_string('manage_token_action_expires', 'enrol_token'), array('optional' => true));
+        $mform->setDefault('expires', $instance['expires']);
+
+        $mform->addElement('html', '</div>');
+
+        $mform->addElement('hidden', 'edit');
+        $mform->setType('edit', PARAM_BOOL);
+        $mform->setDefault('edit', 1);
+
+        $mform->addElement('hidden', 'sesskey');
+        $mform->setType('sesskey', PARAM_RAW);
+        $mform->setDefault('sesskey', sesskey());
+
+        $mform->addElement('hidden', 'enrolid');
+        $mform->setType('enrolid', PARAM_INT);
+        $mform->setDefault('enrolid', $instance['enrolid']);
+
+        $mform->addElement('hidden', 'token');
+        $mform->setType('token', PARAM_RAW);
+        $mform->setDefault('token', $instance['token']);
+
+        $this->add_action_buttons(true, get_string('savechanges'));
+
+    }
+
+    public function validation($data, $files) {
+       $errors = parent::validation($data, $files);
+
+        // seats per token
+        if (($data['seats'] < 1) || ($data['seats'] > MAX_SEATS)) $errors['seats'] = get_string('seatsoutofrange', 'enrol_token', MAX_SEATS);
+        if ($data['seats'] < $data['availble']) $errors['seats'] = get_string('seatslessthanavailable', 'enrol_token');
+
+        // number of token
+        if (($data['available'] < 1) || ($data['available'] > MAX_SEATS)) $errors['available'] = get_string('tokensoutofrange', 'enrol_token', MAX_SEATS);
+        if ($data['available'] > $data['seats']) $errors['available'] = get_string('tokensoutofrange', 'enrol_token',MAX_SEATS);
+
+        // date is in the past
+        if ($data['expires'] < time()) $errors['expires'] = get_string('expirydateinvalid', 'enrol_token');
+
+        return $errors;
+
+    }
+
+    public function setElementError($element, $msg) {
+        $this->_form->setElementError($element, $msg);
+    }
+}
+
 
 // used on the create.php page
 class create_enrol_tokens_form extends moodleform
@@ -120,7 +206,7 @@ class create_enrol_tokens_form extends moodleform
              if ($dbcourse->id > 1) { // 1 = system course
                 $courses[$dbcourseid] = $dbcourse->fullname;
              }
-        } var_dump($this->_customdata);
+        }
 
         // cohorts
         $context = context_system::instance();
@@ -183,10 +269,10 @@ class create_enrol_tokens_form extends moodleform
         $errors = parent::validation($data, $files);
 
         // seats per token
-        if (($data['seatspertoken'] < 1) || ($data['seatspertoken'] > 10000)) $errors['seatspertoken'] = get_string('seatsoutofrange', 'enrol_token');
+        if (($data['seatspertoken'] < 1) || ($data['seatspertoken'] > MAX_SEATS)) $errors['seatspertoken'] = get_string('seatsoutofrange', 'enrol_token');
 
         // number of token
-        if (($data['tokennumber'] < 1) || ($data['tokennumber'] > 10000)) $errors['tokennumber'] = get_string('tokensoutofrange', 'enrol_token');
+        if (($data['tokennumber'] < 1) || ($data['tokennumber'] > MAX_SEATS)) $errors['tokennumber'] = get_string('tokensoutofrange', 'enrol_token');
 
         // email address
         if ((isset($data['emailaddress']) === true) && (trim($data['emailaddress'] != ''))) {
@@ -313,7 +399,6 @@ function enrol_token_manager_create_tokens_external($course_idnumber, $num_seats
  */
 function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row = true) {
     global $DB;
-
     // build SQL statement from given options
     $query = ['t.courseid = ?'];
     $params = [(int)$instance->courseid];
@@ -327,21 +412,23 @@ function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row 
     // see https://stackoverflow.com/a/55866244/1238884
     $fields = '
             t.id token,
+            t.courseid,
             h.name cohort,
             h.id cohortid,
             t.numseats total,
             t.seatsavailable remaining,
             t.createdby createdby,
             t.timecreated created,
-            t.timeexpire expires,
-            l.`userid` usedby,
-            l.`timecreated` timeused ';
+            t.timeexpire expires
+    ';
+            // l.`userid` usedby,
+            // l.`timecreated` timeused ';
     $from = '{cohort} h
         inner join {enrol_token_tokens} t on t.`cohortid` = h.`id`
-        left outer join {enrol_token_log} l on t.id = l.`token`
     ';
-    $order = 't.timecreated desc,
-            l.timecreated desc';
+        // left outer join {enrol_token_log} l on t.id = l.`token`
+    $order = 't.timecreated desc';
+        //    l.timecreated desc';
 
     // the recordset's id column is text (the token key); we might need a numeric id column, so create one
     if ($include_row) {
@@ -355,4 +442,30 @@ function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row 
     }
 
     return $DB->get_records_sql("SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}", $params);
+}
+
+function enrol_token_get_token_users($token,$courseid) {
+	global $DB;
+	$results = [];
+	foreach ($DB->get_records("enrol_token_log", array("token" => $token), 'timecreated') as $row) {
+        $results[] = [
+            "userid" => $row->userid,
+            "timecreated" => $row->timecreated,
+        ];
+    }
+    return $results;
+}
+
+function enrol_token_get_token_users_list($token,$courseid) {
+    $list = enrol_token_get_token_users($token,$courseid);    
+	$results = [];
+    foreach ($list as $row) {
+		$url = new \moodle_url('/user/profile.php', array('id' => $row['userid'], 'course' => $courseid));
+        $link = \html_writer::link($url, fullname(\core_user::get_user($row['userid']))) . ' (' . userdate($row['timecreated']) . ')';
+        $results[] = \html_writer::tag('li', $link);
+    };
+    if (count($results) > 0) {
+        return \html_writer::tag('ul', implode('',$results));
+    }
+    return '';
 }
