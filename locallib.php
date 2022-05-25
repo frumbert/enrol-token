@@ -173,14 +173,14 @@ class modify_token_form extends moodleform {
 
         // seats per token
         if (($data['seats'] < 1) || ($data['seats'] > MAX_SEATS)) $errors['seats'] = get_string('seatsoutofrange', 'enrol_token', MAX_SEATS);
-        if ($data['seats'] < $data['availble']) $errors['seats'] = get_string('seatslessthanavailable', 'enrol_token');
+        if ($data['seats'] < $data['available']) $errors['seats'] = get_string('seatslessthanavailable', 'enrol_token');
 
         // number of token
         if (($data['available'] < 1) || ($data['available'] > MAX_SEATS)) $errors['available'] = get_string('tokensoutofrange', 'enrol_token', MAX_SEATS);
         if ($data['available'] > $data['seats']) $errors['available'] = get_string('tokensoutofrange', 'enrol_token',MAX_SEATS);
 
         // date is in the past
-        if ($data['expires'] < time()) $errors['expires'] = get_string('expirydateinvalid', 'enrol_token');
+        if ($data['expires'] > 0 && $data['expires'] < time()) $errors['expires'] = get_string('expirydateinvalid', 'enrol_token');
 
         return $errors;
 
