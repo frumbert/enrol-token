@@ -309,6 +309,7 @@ class enrol_token_plugin extends enrol_plugin
 
         // map crappy customint field names to descriptive field names
         if (isset($settings->ipthrottlingperiod) === false) $settings->ipthrottlingperiod = $settings->customint1;
+
         if (isset($settings->userthrottlingperiod) === false) $settings->userthrottlingperiod = $settings->customint3;
 
         // check if ip address or user is throttled from entering tokens
@@ -332,7 +333,6 @@ class enrol_token_plugin extends enrol_plugin
         }
 
         // user already enrolled in course? return SUCCESS
-        var_dump('token rec course ' . $tokenRec->courseid);
         if ((isloggedin() === true) && (is_enrolled(context_course::instance($tokenRec->courseid), $USER, '', true) === true)) {
             return true;
         }
