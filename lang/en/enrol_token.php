@@ -168,6 +168,8 @@ $string['create_token_email_body_default'] = "<p>Hello,</p>
 
 $string['create_token_result_header'] = 'Here are your tokens';
 
+$string['admin_token_report'] = 'Token report';
+$string['admin_token_report_detail'] = 'Open a report showing all tokens and their usage: {$a}';
 
 $string['manage_token_header_token'] = 'Token';
 $string['manage_token_header_cohort'] = 'Cohort';
