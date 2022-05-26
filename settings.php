@@ -94,4 +94,14 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configselect('enrol_token/longtimenosee', get_string('longtimenosee', 'enrol_token'), get_string('longtimenosee_help', 'enrol_token'), 0, $options));
 
     $settings->add(new admin_setting_configcheckbox('enrol_token/sendcoursewelcomemessage', get_string('sendcoursewelcomemessage', 'enrol_token'), get_string('sendcoursewelcomemessage_help', 'enrol_token'), 1));
+
+    $url = new moodle_url('/enrol/token/report.php', ['sesskey' => sesskey()]);
+    $link = html_writer::link($url, get_string('admin_token_report', 'enrol_token'));
+    $settings->add(new admin_setting_heading(
+            'tokenreport',
+            new lang_string('admin_token_report', 'enrol_token'),
+            new lang_string('admin_token_report_detail', 'enrol_token', $link)
+        )
+    );
+
 }
