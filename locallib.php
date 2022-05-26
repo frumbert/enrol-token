@@ -398,10 +398,16 @@ function enrol_token_manager_create_tokens_external($course_idnumber, $num_seats
  * @return $DB rows
  */
 function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row = true) {
-    global $DB;
+    global $DB, $COURSE;
+    // only site admin can view all (e.g. any course)
+    $courseid = isset($instance->courseid) ? (int)$instance->courseid : $COURSE->id;
+    if (is_siteadmin() && is_number($instance) && $instance < 1) {
+        $courseid = 0;
+    }
     // build SQL statement from given options
-    $query = ['t.courseid = ?'];
-    $params = [(int)$instance->courseid];
+    $operand = $courseid>0?'=':'>';
+    $query = ["t.courseid {$operand} ?"];
+    $params = [$courseid];
     if ($filter != '') {
         $query[] = 't.id LIKE ?';
         $params[] = str_replace(['*', '?'], ['%', '_'], $filter);
@@ -441,7 +447,9 @@ function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row 
         $from .= ', (select @row_num:=0 as num) as c';
     }
 
-    return $DB->get_records_sql("SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}", $params);
+    $sql = "SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}";
+    // var_dump($sql,$params);
+    return $DB->get_records_sql($sql, $params);
 }
 
 function enrol_token_get_token_users($token,$courseid) {
@@ -455,9 +463,7 @@ function enrol_token_get_token_users($token,$courseid) {
     }
     return $results;
 }
-
-function enrol_token_get_token_users_list($token,$courseid) {
-    $list = enrol_token_get_token_users($token,$courseid);    
+function enrol_token_get_token_user_list_render($list,$courseid) {
 	$results = [];
     foreach ($list as $row) {
 		$url = new \moodle_url('/user/profile.php', array('id' => $row['userid'], 'course' => $courseid));
@@ -468,4 +474,73 @@ function enrol_token_get_token_users_list($token,$courseid) {
         return \html_writer::tag('ul', implode('',$results));
     }
     return '';
+}
+
+function enrol_token_get_token_users_list($token,$courseid) {
+    $list = enrol_token_get_token_users($token,$courseid);
+    return enrol_token_get_token_user_list_render($list,$courseid);  
+}
+
+// format the data for the report
+// if a token has users, list multiple duplicate rows for each user/token
+function enrol_token_format_data_for_report($data) {
+
+    function addrow($data, $userid = null, $timecreated = null) {
+        global $DB;
+        $row = [];
+        $row[] = ($DB->get_record('course', array('id' => $data->courseid))->fullname);
+        $row[] = $data->token;
+        $row[] = $data->cohort;
+        $row[] = fullname(\core_user::get_user($data->createdby));
+        $row[] = $data->total;
+        $row[] = $data->remaining;
+        $row[] = userdate($data->created);
+        $row[] = (intval($data->expires) > 0) ? userdate($data->expires) : '';
+        if (is_null($userid)) {
+            $row[] = '';
+            $row[] = '';
+        } else {
+            $row[] = fullname(\core_user::get_user($userid));
+            $row[] = userdate($timecreated);
+        }
+        return $row;
+    }
+
+    $results = new stdClass();
+    $results->columns = [
+        get_string('course'),
+        get_string('manage_token_header_token','enrol_token'),
+        get_string('manage_token_header_cohort','enrol_token'),
+        get_string('manage_token_header_createdby','enrol_token'),
+        get_string('manage_token_action_seats','enrol_token'),
+        get_string('manage_token_action_remaining','enrol_token'),
+        get_string('manage_token_header_datecreated','enrol_token'),
+        get_string('manage_token_header_dateexpires','enrol_token'),
+        get_string('manage_token_header_usedby','enrol_token'),
+        get_string('manage_token_header_dateused','enrol_token')
+    ];
+    $results->rows = [];
+    foreach ($data as $record) {
+        $usedby = enrol_token_get_token_users($record->token, $record->courseid);
+        if (count($usedby) > 0) {
+            foreach($usedby as $user) {
+                $results->rows[] = addrow($record, $user['userid'], $user['timecreated']);
+            }
+        } else {
+            $results->rows[] = addrow($record);
+        }
+    }
+    $results->totals = [
+        '',
+        count(array_unique(array_column($results->rows, 1))), // total tokens
+        count(array_unique(array_column($results->rows, 2))), // total cohorts
+        count(array_unique(array_column($results->rows, 3))), // total creators
+        array_sum(array_column($results->rows,4)), // total seats
+        array_sum(array_column($results->rows,5)), // total remaining
+        '',
+        '',
+        '',
+        '',
+    ];
+    return $results;
 }

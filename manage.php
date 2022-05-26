@@ -97,7 +97,6 @@ navigation_node::override_active_url(new moodle_url('/enrol/instances.php', arra
 $url = new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid]);
 $form = new view_enrol_token_usage_form($url);
 
-
 if ($editing) {
 	$form->set_data(['token' => $token]);
 	$token_row = $DB->get_record('enrol_token_tokens', array('id'=>$token), '*', MUST_EXIST);
@@ -146,37 +145,45 @@ if ((isset($_REQUEST) === true) && (isset($_REQUEST['del']) === true)) {
 	}
 }
 
-// a basic csv downloader of all tokens
+// download a spreadsheet of the report data (excel file)
 if ($download === 1) {
 
-	$data = enrol_token_manager_find_tokens($instance, '*', false);
-	$fields = ['token','cohort','cohortid','total','remaining','createdby','created','expires','usedby','timeused'];
-    $exportdata = new ArrayObject($data);
-    $iterator = $exportdata->getIterator();
+	require_once($CFG->libdir . '/excellib.class.php');
 
-    $filename = clean_filename('tokens');
-    \core\dataformat::download_data(
-        $filename,
-    	'csv',
-        $fields,
-	    $iterator,
-    	function($exportdata) use ($fields) {
-            $data = new stdClass();
+	// generate the report data based on the existing paramaeters
+	$data = enrol_token_manager_find_tokens($instance, $token, false);
+	$reportdata = enrol_token_format_data_for_report($data);
 
-            foreach ($fields as $field) {
-                // Set data field's value from the export data's equivalent field by default.
-                $data->$field = $exportdata->$field ?? null;
-			}
+	// render the report to a html table
+	$renderer = $PAGE->get_renderer('enrol_token');
+	$report = new \enrol_token\output\export($reportdata);
+	$table = $renderer->render_export($report);
 
-            $data->created = userdate($data->created);
-            $data->expires = is_null($data->expires) ? '' : userdate($data->expires);
-            $data->timeused = is_null($data->timeused) ? '' : userdate($data->timeused);
+	// create an excel spreadsheet
+	$objOutput = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
+	$table = "<!doctype html><html><body>{$table}</body></html>";
 
-			return $data;
+	// save the html to a temp file
+	$tmpfile = tempnam(sys_get_temp_dir(), 'html');
+	file_put_contents($tmpfile, $table);
 
-    	}
-    );
-    die();
+	// read the html back in as a sheet (table conversion happens automatically when loading html)
+	$excelHTMLReader = new \PhpOffice\PhpSpreadsheet\Reader\Html;
+	$excelHTMLReader->loadIntoExisting($tmpfile, $objOutput);
+	unlink($tmpfile);
+
+    $objOutput->setActiveSheetIndex(0);
+
+    // send to browser as an attachment
+	$filename = clean_filename("TokenReport_".date_format(date_create("now"),"YmdHis")).'.xls';
+    header('Content-type: application/excel');
+    header("Content-Disposition:attachment;filename={$filename}");
+
+    // send to php output stream directly
+    $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($objOutput);
+    $writer->save('php://output');
+
+    exit(0);
 
 }
 
@@ -199,9 +206,9 @@ if ($editing) {
 		if (is_null($data)) $data = new stdClass();
 		if ($force === 1) $data->token = '*';
 
-		$data = enrol_token_manager_find_tokens($instance, $data->token);
+		$records = enrol_token_manager_find_tokens($instance, $data->token);
 
-		if (count($data) === 0) {
+		if (count($records) === 0) {
 			echo $OUTPUT->error_text('No records');
 		} else {
 			$table = new html_table();
@@ -231,7 +238,7 @@ if ($editing) {
 			// $table->no_sorting('cohort');
 			// $table->setup();
 
-			foreach ($data as $record) {
+			foreach ($records as $record) {
 
 				// var_dump($record);
 
@@ -289,7 +296,7 @@ if ($editing) {
 
 			echo html_writer::empty_tag('br');
 
-			echo html_writer::link(new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid, 'execute' => 1, 'download' => 1]), html_writer::tag('button', get_string('downloadtext'), ['class' => 'btn btn-secondary']));
+			echo html_writer::link(new moodle_url('/enrol/token/manage.php', ['enrolid' => $enrolid, 'execute' => 1, 'download' => 1]), html_writer::tag('button', get_string('downloadexcel'), ['class' => 'btn btn-secondary']));
 
 		}
 	}
