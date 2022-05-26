@@ -99,8 +99,8 @@ if ($ADMIN->fulltree) {
     $link = html_writer::link($url, get_string('admin_token_report', 'enrol_token'));
     $settings->add(new admin_setting_heading(
             'tokenreport',
-            new lang_string('admin_token_report', 'enrol_token'),
-            new lang_string('admin_token_report_detail', 'enrol_token', $link)
+            get_string('admin_token_report', 'enrol_token'),
+            get_string('admin_token_report_detail', 'enrol_token', $link)
         )
     );
 
