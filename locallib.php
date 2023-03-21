@@ -211,7 +211,7 @@ class create_enrol_tokens_form extends moodleform
         // cohorts
         $context = context_system::instance();
         $cohorts = array();
-        $dbcohorts = cohort_get_cohorts($context->id);
+        $dbcohorts = cohort_get_cohorts($context->id, 0, 100);
         foreach ($dbcohorts['cohorts'] as $dbcohort) $cohorts[$dbcohort->id] = $dbcohort->name;
 
         // cohort selection
