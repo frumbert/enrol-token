@@ -1,5 +1,4 @@
 <?php
-
 // This file is part of Moodle - http://moodle.org/
 //
 // Moodle is free software: you can redistribute it and/or modify
@@ -15,19 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-
-
 /**
- * token enrolment plugin version specification.
+ * Task schedule configuration for the plugintype_pluginname plugin.
  *
- * @package    enrol_token
- * @copyright  2020 tim st. clair <tim.stclair@gmail.com>
- * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
+ * @package   enrol_token
+ * @copyright 2023 <tim.stclair@gmail.com>
+ * @license   http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
 defined('MOODLE_INTERNAL') || die();
 
-$plugin->version = 2025081600;  // The current plugin version (Date: YYYYMMDDXX)
-$plugin->requires = 2013050100;  // Requires this Moodle version
-$plugin->component = 'enrol_token';  // Full name of the plugin (used for diagnostics)
-// $plugin->cron = 600;
+$tasks = [
+    [
+        'classname' => 'enrol_token\task\token_tasks',
+        'blocking' => 0,
+        'minute' => '*/10',
+        'hour' => '*',
+        'day' => '*',
+        'dayofweek' => '*',
+        'month' => '*'
+    ]
+];

@@ -111,7 +111,7 @@ $string['viewusers'] = 'View details';
 $string['revoketokens'] = 'Delete selected token(s)';
 $string['tokens_revoked'] = '{$a->count} token(s) were deleted';
 $string['tokens_revoked_error'] = 'Something went wrong deleting the tokens';
-
+$string['token_tasks'] = 'Token scheduled tasks';
 $string['create_token'] = 'Create tokens';
 $string['create_token_submit'] = 'Create';
 $string['create_token_tokens'] = 'Tokens';
@@ -195,3 +195,13 @@ $string['tokensoutofrange'] = 'The number of tokens you entered must be between 
 $string['expirydateinvalid'] = 'The expiry date must be in the future';
 
 $string['token_value'] = 'Token: {$a}';
+$string['wrongcourse'] = 'This token may be for a different course';
+
+$string['tokenrequired'] = 'A token code will be required to enrol';
+$string['alreadyenrol'] = 'You might already be enrolled';
+
+$string['canntenrol'] = 'Enrolment is disabled or inactive';
+$string['canntenrolearly'] = 'You cannot enrol yet; enrolment starts on {$a}.';
+$string['canntenrollate'] = 'You cannot enrol any more, since enrolment ended on {$a}.';
+
+$string['entertoken'] = 'Enter token';

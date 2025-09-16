@@ -25,6 +25,9 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use core\output\single_button;
+use core_enrol\output\enrol_page;
+
 require_once("$CFG->dirroot/cohort/lib.php");
 
 class enrol_token_plugin extends enrol_plugin
@@ -80,6 +83,9 @@ class enrol_token_plugin extends enrol_plugin
         return true;
     }
 
+    /*
+     * @depreciated - see is_token_enrol_available instead
+     */
     public function show_enrolme_link(stdClass $instance) {
         global $CFG, $USER;
 
@@ -257,7 +263,10 @@ class enrol_token_plugin extends enrol_plugin
         return false;
     }
 
-    // ensures plugin settings are allowing enrolments
+    /*
+     * ensures plugin settings are allowing enrolments
+     * @depreciated - see is_token_enrol_available instead
+     */
     public function isEnrolable($settings) {
 
         // can not enrol guest!!
@@ -287,6 +296,17 @@ class enrol_token_plugin extends enrol_plugin
         }
 
         return null;
+    }
+
+    /**
+     * checks if the course the token is for is the same as the current course
+     * @param string $tokenValue the token the user entered
+     * @return bool true if the course is the same as the current course
+     */
+    public static function checkTokenIsForCurrentCourse($tokenValue) {
+        global $COURSE, $DB;
+        $tokencourseid = $DB->get_field('enrol_token_tokens', 'courseid', array('id' => $tokenValue));
+        return strcmp($tokencourseid,$COURSE->id) === 0;
     }
 
     /**
@@ -333,6 +353,7 @@ class enrol_token_plugin extends enrol_plugin
         }
 
         // user already enrolled in course? return SUCCESS
+        // GOTCHA: is the course the token is for the same as the course we are trying to enrol in? It's not knowable here. Do that in the caller routiner.
         if ((isloggedin() === true) && (is_enrolled(context_course::instance($tokenRec->courseid), $USER, '', true) === true)) {
             return true;
         }
@@ -462,6 +483,64 @@ class enrol_token_plugin extends enrol_plugin
 
     }
 
+    public function is_token_enrol_available($instance) {
+        global $CFG, $DB, $USER;
+
+        if ($instance->status != ENROL_INSTANCE_ENABLED) {
+            return get_string('canntenrol', 'enrol_token');
+        }
+
+        if ($instance->enrolstartdate != 0 and $instance->enrolstartdate > time()) {
+            return get_string('canntenrolearly', 'enrol_self', userdate($instance->enrolstartdate));
+        }
+
+        if ($instance->enrolenddate != 0 and $instance->enrolenddate < time()) {
+            return get_string('canntenrollate', 'enrol_self', userdate($instance->enrolenddate));
+        }
+
+        if (!$instance->customint6) {
+            // New enrols not allowed.
+            return get_string('canntenrol', 'enrol_self');
+        }
+
+        if ($DB->record_exists('user_enrolments', array('userid' => $USER->id, 'enrolid' => $instance->id))) {
+            return get_string('alreadyenrol', 'enrol_self');
+        }
+
+        // can we know if there are any places left on any token available in this instance?
+
+        return true;
+
+    }
+
+    public function can_token_enrol(stdClass $instance, $checkuserenrolment = true) {
+        global $DB, $OUTPUT, $USER;
+
+        if ($checkuserenrolment) {
+            if (isguestuser()) {
+                // Can not enrol guest.
+                return get_string('noguestaccess', 'enrol') . $OUTPUT->continue_button(get_login_url());
+            }
+            // Check if user is already enroled.
+            if ($DB->get_record('user_enrolments', array('userid' => $USER->id, 'enrolid' => $instance->id))) {
+                return get_string('alreadyenrol', 'enrol_token');
+            }
+        }
+
+        // Check if this token enrolment is available right now for users (has seats, enabled, etc).
+        $result = $this->is_token_enrol_available($instance);
+        if ($result !== true) {
+            return $result;
+        }
+
+        // Check if user has the capability to enrol in this context.
+        if (!has_capability('enrol/token:enrolself', context_course::instance($instance->courseid))) {
+            return get_string('canntenrol', 'enrol_self');
+        }
+
+        return true;
+    }
+
     /**
      * Creates course enrol form, checks if form submitted
      * and enrols user if necessary. It can also redirect.
@@ -469,58 +548,50 @@ class enrol_token_plugin extends enrol_plugin
      * @param stdClass $instance
      * @return string html text, usually a form in a text box
      */
+    #[\Override]
     public function enrol_page_hook(stdClass $instance) {
-        global $CFG, $OUTPUT;
+        global $CFG, $OUTPUT, $USER, $PAGE;
 
-        require_once ("$CFG->dirroot/enrol/token/locallib.php");
+        $buttonurl = null;
+        $buttontext = '';
+        $buttonattrs = [];
+        $body = '';
+        $title = $this->get_instance_name($instance);
 
-        // process form
-        $form = new enrol_token_enrol_form(NULL, $instance);
-
-        // has form been posted back with a token value
-        if (($data = $form->get_data()) && (empty($data->enroltoken) === false)) {
-
-            // enrol the user using the token
-            $courseId = 0;
-            $tokenError = $this->doEnrolment($data->enroltoken, $courseId);
-
-            // if there was an error, report it to user
-            if ($tokenError !== true) {
-                switch ($tokenError) {
-                    case (1):
-                        $tokenError = get_string('toomanyattempts', 'enrol_token');
-                        break;
-
-                    case (2):
-                        $tokenError = get_string('tokendoesntexist', 'enrol_token');
-                        break;
-
-                    case (3):
-                        $tokenError = get_string('noseatsavailable', 'enrol_token');
-                        break;
-
-                    case (4):
-                        $tokenError = get_string('tokenexpired', 'enrol_token');
-                        break;
-
-                    case (5):
-                        $tokenError = get_string('databaseerror', 'enrol_token');
-                        break;
-
-                    default:
-                        $tokenError = get_string('notenrolable', 'enrol_token');
-                        break;
-                }
-
-                $form->setElementError('enroltoken', $tokenError);
-            }
+        $enrolstatus = $this->can_token_enrol($instance);
+        if ($enrolstatus === true) {
+            $body = get_string('tokenrequired', 'enrol_token');
+            $buttonurl = $PAGE->url;
+            $buttonattrs = [
+                'data-id' => $instance->courseid,
+                'data-instance' => $instance->id,
+                'data-form' => enrol_token\form\enrol_form::class,
+                'data-title' => $title,
+            ];
+            $PAGE->requires->js_call_amd('enrol_token/enrol_page', 'initEnrol', [$instance->id]);
+            $buttontext = get_string('enrolme', 'enrol_self');
+        } else if (isguestuser()) {
+            // User is not logged in. Display a button to login.
+            $buttonurl = new moodle_url(get_login_url());
+            $body = get_string('noguestaccess', 'enrol');
+            $buttontext = get_string('continue');
+        } else if (!$enrolstatus) {
+            // No reason why user can not use this method, do not display anything.
+            return '';
+        } else {
+            $body = $enrolstatus;
         }
 
-        ob_start();
-        $form->display();
-        $output = ob_get_clean();
-
-        return $OUTPUT->box($output);
+        $notification = new \core\output\notification($body, 'info', false);
+        $notification->set_extra_classes(['mb-0']);
+        $enrolpage = new enrol_page(
+            instance: $instance,
+            header: $title,
+            body: $OUTPUT->render($notification),
+            buttons: $buttonurl ?
+                [new single_button($buttonurl, $buttontext, 'get', single_button::BUTTON_PRIMARY, $buttonattrs)] :
+                []);
+        return $OUTPUT->render($enrolpage);
     }
 
     private function record_token($userid, $token) {

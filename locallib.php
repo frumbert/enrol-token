@@ -56,54 +56,57 @@ class view_enrol_token_usage_form extends moodleform
 }
 
 
-class enrol_token_enrol_form extends moodleform
-{
-    protected $instance;
+// class enrol_token_enrol_form extends moodleform
+// {
+//     protected $instance;
 
-    /**
-     * Overriding this function to get unique form id for multiple token enrolments.
-     *
-     * @return string form identifier
-     */
-    protected function get_form_identifier() {
-        $formid = $this->_customdata->id . '_' . get_class($this);
-        return $formid;
-    }
+//     /**
+//      * Overriding this function to get unique form id for multiple token enrolments.
+//      *
+//      * @return string form identifier
+//      */
+//     protected function get_form_identifier() {
+//         $formid = $this->_customdata->id . '_' . get_class($this);
+//         return $formid;
+//     }
 
-    public function definition() {
-        $mform = $this->_form;
-        $instance = $this->_customdata;
-        $this->instance = $instance;
+//     public function definition() {
+//         $mform = $this->_form;
+//         $instance = $this->_customdata;
+//         $this->instance = $instance;
+//         $plugin = enrol_get_plugin('token');
 
-        $mform->addElement('html', '<div id="tokenenrolarea">');
+//         $this->instance = $instance;
 
-        $mform->addElement('html', '<h3>' . get_string('enrol_header', 'enrol_token') . '</h3>');
-        $mform->addElement('html', '<p>' . get_string('tokeninput', 'enrol_token') . '</p>');
+//         $mform->addElement('html', '<div id="tokenenrolarea">');
 
-        $mform->addElement('text', 'enroltoken', get_string('enrol_label', 'enrol_token'), array('id' => 'enroltoken_' . $instance->id));
-        $mform->setType('enroltoken', PARAM_ALPHANUMEXT);
+//         $mform->addElement('html', '<h3>' . get_string('enrol_header', 'enrol_token') . '</h3>');
+//         $mform->addElement('html', '<p>' . get_string('tokeninput', 'enrol_token') . '</p>');
 
-        $mform->addElement('submit', 'submitbutton', get_string('enrolme', 'enrol_token'));
+//         $mform->addElement('text', 'enroltoken', get_string('enrol_label', 'enrol_token'), array('id' => 'enroltoken_' . $instance->id));
+//         $mform->setType('enroltoken', PARAM_ALPHANUMEXT);
 
-        $mform->addElement('html', '</div>');
+//         $mform->addElement('submit', 'submitbutton', get_string('enrolme', 'enrol_token'));
 
-        $mform->addElement('hidden', 'id');
-        $mform->setType('id', PARAM_INT);
-        $mform->setDefault('id', $instance->courseid);
+//         $mform->addElement('html', '</div>');
 
-        $mform->addElement('hidden', 'instance');
-        $mform->setType('instance', PARAM_INT);
-        $mform->setDefault('instance', $instance->id);
-    }
+//         $mform->addElement('hidden', 'id');
+//         $mform->setType('id', PARAM_INT);
+//         $mform->setDefault('id', $instance->courseid);
 
-    public function validation($data, $files) {
-        return parent::validation($data, $files);
-    }
+//         $mform->addElement('hidden', 'instance');
+//         $mform->setType('instance', PARAM_INT);
+//         $mform->setDefault('instance', $instance->id);
+//     }
 
-    public function setElementError($element, $msg) {
-        $this->_form->setElementError($element, $msg);
-    }
-}
+//     public function validation($data, $files) {
+//         return parent::validation($data, $files);
+//     }
+
+//     public function setElementError($element, $msg) {
+//         $this->_form->setElementError($element, $msg);
+//     }
+// }
 
 class modify_token_form extends moodleform {
     protected $instance;
@@ -196,7 +199,7 @@ class modify_token_form extends moodleform {
 class create_enrol_tokens_form extends moodleform
 {
     function definition() {
-        global $USER;
+        global $USER, $COURSE;
         $mform = $this->_form;
 
         // course
@@ -221,6 +224,8 @@ class create_enrol_tokens_form extends moodleform
         $mform->addElement('select', 'cohortexisting', get_string('create_cohort_select', 'enrol_token'), $cohorts);
         $mform->addElement('static', '', '', 'OR');
         $mform->addElement('text', 'cohortnew', get_string('create_cohort_new', 'enrol_token'), 'maxlength="253" size="25"');
+        $field =& $mform->getElement('cohortnew');
+        $field->updateAttributes(['placeholder'=>enrol_token_new_cohort_id($COURSE)]);
         $mform->setType('cohortnew', PARAM_CLEANHTML);
 
         // token parameters
@@ -312,7 +317,7 @@ function enrol_token_manager_generate_token_data($tokennumber, $prefix) {
     $characters = '23456789abcdefghiknpqrstuwxyzABCDFGHJKLMPQRSTVXYZ'; // skip confusing letters
     $len_characters = strlen($characters);
 
-    if (strlen($prefix) > 4) $prefix = substr($dprefix, 0, 4);
+    if (strlen($prefix) > 4) $prefix = substr($prefix, 0, 4);
     for ($count = 0; ($count < $tokennumber); ++$count) {
         for ($goodToken = false; ($goodToken === false); /* empty */ ) {
             $goodToken = false;
@@ -345,7 +350,7 @@ function enrol_token_manager_create_cohort_id($cohort_name, $cohort_idnumber) {
     return $cohortid;
 }
 
-function enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $places_per_seat, $expirydate) {
+function enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $places_per_seat, $expirydate, $enrol_days = 0) {
     global $DB, $USER;
     $expiry_date = ($expirydate == 0) ? 0 : ($expirydate + (24 * 60 * 60)); // date specified is inclusive
     if (($transaction = $DB->start_delegated_transaction()) === null) throw new coding_exception('Invalid delegated transaction object');
@@ -360,7 +365,7 @@ function enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $pla
             $tokenRec->createdby = $USER->id;
             $tokenRec->timecreated = time();
             $tokenRec->timeexpire = $expiry_date;
-            if ($DB->insert_record_raw('enrol_token_tokens', $tokenRec, false, false, true) === false) throw new Excpetion('enrol_token_manager: token storage failed');
+            if ($DB->insert_record_raw('enrol_token_tokens', $tokenRec, false, false, true) === false) throw new Exception('enrol_token_manager: token storage failed');
         }
         $transaction->allow_commit();
     } catch(Exception $e) {
@@ -384,7 +389,7 @@ function enrol_token_manager_create_tokens_external($course_idnumber, $num_seats
     $tokens = enrol_token_manager_generate_token_data($num_seats, $prefix);
 
     // save them into the database
-    enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $places_per_seat, $expirydate);
+    enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $places_per_seat, $expirydate );
 
     // return the tokens
     return $tokens;
@@ -543,4 +548,8 @@ function enrol_token_format_data_for_report($data) {
         '',
     ];
     return $results;
+}
+
+function enrol_token_new_cohort_id($course) {
+  return date('Ym') . '_' . preg_replace('/[^a-zA-Z]/', '', $course->shortname);
 }

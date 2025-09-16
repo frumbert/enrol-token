@@ -76,4 +76,13 @@ $capabilities = array(
             'manager' => CAP_ALLOW,
         )
     ),
+
+    /* the ability to enrol yourself with a token - might want to limit ability to certain roles */
+    'enrol/token:enrolself' => array(
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_COURSE,
+        'archetypes' => array(
+            'user' => CAP_ALLOW,
+        )
+    ),
 );
