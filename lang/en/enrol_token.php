@@ -205,3 +205,4 @@ $string['canntenrolearly'] = 'You cannot enrol yet; enrolment starts on {$a}.';
 $string['canntenrollate'] = 'You cannot enrol any more, since enrolment ended on {$a}.';
 
 $string['entertoken'] = 'Enter token';
+$string['token:enrolself'] = 'Enrol self with token';
