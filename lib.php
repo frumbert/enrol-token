@@ -899,11 +899,11 @@ class enrol_token_plugin extends enrol_plugin
     public function get_manual_enrol_button(course_enrolment_manager $manager) {
         if (is_siteadmin()) {
 
-            $link = new moodle_url("/user/editadvanced.php", ["id" => "-1"]);
+            $link = new \moodle_url("/user/editadvanced.php", ["id" => "-1"]);
             $button = new single_button($link, get_string('addnewuser'), 'get');
             $button->class .= ' enrol_manual_plugin';
 
-            return [null,$button]; // sUChgCguv
+            return [$button];
         }
     }
 
