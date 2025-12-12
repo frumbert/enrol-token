@@ -832,7 +832,7 @@ class enrol_token_plugin extends enrol_plugin
             $button = new single_button($link, get_string('addnewuser'), 'get');
             $button->class .= ' enrol_manual_plugin';
 
-            return [null,$button]; // sUChgCguv
+            return [$button];
         }
     }
 
