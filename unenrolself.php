@@ -53,7 +53,15 @@ $PAGE->set_title($plugin->get_instance_name($instance));
 if ($confirm and confirm_sesskey()) {
     $plugin->unenrol_user($instance, $USER->id);
 
-    add_to_log($course->id, 'course', 'unenrol', '../enrol/users.php?id=' . $course->id, $course->id); //TODO: there should be userid somewhere!
+    // Trigger user unenrolled event.
+    $event = \core\event\user_unenrolled::create(array(
+        'courseid' => $course->id,
+        'context' => $context,
+        'relateduserid' => $USER->id,
+        'objectid' => $instance->id,
+        'other' => array('userenrolment' => $instance->id)
+    ));
+    $event->trigger();
 
     redirect(new moodle_url('/index.php'));
 }
