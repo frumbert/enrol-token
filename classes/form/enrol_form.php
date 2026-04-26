@@ -160,6 +160,28 @@ class enrol_form extends dynamic_form {
             require_once($CFG->dirroot . '/course/lib.php');
             $destination = course_get_url($this->get_instance()->courseid);
         }
+
+        // validate that the course that the token was just used for is the course we are going to and modify if required
+        $courseid = $this->get_plugin()->get_courseid_for_token($tokenValue);
+        if ($destination instanceof \moodle_url) {
+            $destinationpath = $destination->get_path();
+            if ($destinationpath === '/course/view.php') {
+                $destinationcourseid = $destination->get_param('id');
+                if ($destinationcourseid && $destinationcourseid != $courseid) {
+                    $destination = course_get_url($courseid); // token submitted was for a different course - go there instead
+                }
+            }
+        } else if (is_string($destination)) {
+            // Handle string URLs
+            $parsedurl = parse_url($destination);
+            if (isset($parsedurl['path']) && $parsedurl['path'] === '/course/view.php') {
+                parse_str($parsedurl['query'] ?? '', $queryparams);
+                if (isset($queryparams['id']) && $queryparams['id'] != $courseid) {
+                    $destination = course_get_url($courseid);
+                }
+            }
+        }
+
         return $destination;
     }
 
