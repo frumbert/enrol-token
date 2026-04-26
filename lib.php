@@ -384,8 +384,24 @@ class enrol_token_plugin extends enrol_plugin
             // enrol the user in the course
             $this->enrol_user($settings, $USER->id, $settings->roleid, $timestart, $timeend);
 
+            // also enrol into other courses if they have been selected
+            if (!empty($settings->customtext2)) {
+                $manualenrol = enrol_get_plugin('manual');
+                $othercourseids = explode(',', $settings->customtext2);
+                foreach ($othercourseids as $othercourseid) {
+                    if (empty($othercourseid)) {
+                        continue;
+                    }
+                    if ($otherinstance = $this->get_or_create_manual_enrol_instance($othercourseid)) {
+                        $manualenrol->enrol_user($otherinstance, $USER->id, $otherinstance->roleid, $timestart, $timeend);
+                    }
+                }
+            }
+
             // add the user to the cohort for this enrolment (cohort/lib.php)
-            cohort_add_member($cohortid, $USER->id);
+            if (!empty($cohortid)) {
+                cohort_add_member($cohortid, $USER->id);
+            }
 
             // record this token enrolment for this user so we have an easy track of its usage
             $this->record_token($USER->id, $tokenValue);
@@ -423,6 +439,12 @@ class enrol_token_plugin extends enrol_plugin
 
     }
 
+    public function get_courseid_for_token($token) {
+      global $DB;
+      return $DB->get_field('enrol_token_tokens', 'courseid', ['id' => $token]);
+    }
+
+
    /**
      * assumes that the token and course is set up and is valid (i.e. has been checked, has seats remaining, etc)
      *
@@ -430,7 +452,7 @@ class enrol_token_plugin extends enrol_plugin
      * @param user user user record
      * @return boolean true if enrolment was a success, false if not
      */
- 
+
     public function perform_trusted_enrolment($token, $user) {
         global $DB;
 
@@ -456,8 +478,24 @@ class enrol_token_plugin extends enrol_plugin
             // enrol the user in the course
             $this->enrol_user($settings, $user->id, $settings->roleid, $timestart, $timeend);
 
+            // also enrol into other courses if they have been selected
+            if (!empty($settings->customtext2)) {
+                $manualenrol = enrol_get_plugin('manual');
+                $othercourseids = explode(',', $settings->customtext2);
+                foreach ($othercourseids as $othercourseid) {
+                    if (empty($othercourseid)) {
+                        continue;
+                    }
+                    if ($otherinstance = $this->get_or_create_manual_enrol_instance($othercourseid)) {
+                        $manualenrol->enrol_user($otherinstance, $user->id, $otherinstance->roleid, $timestart, $timeend);
+                    }
+                }
+            }
+
             // add the user to the cohort for this enrolment (cohort/lib.php)
-            cohort_add_member($cohortid, $user->id);
+            if (!empty($cohortid)) {
+                cohort_add_member($cohortid, $user->id);
+            }
 
             // record this token enrolment for this user so we have an easy track of its usage
             $this->record_token($user->id, $token);
@@ -592,6 +630,40 @@ class enrol_token_plugin extends enrol_plugin
                 [new single_button($buttonurl, $buttontext, 'get', single_button::BUTTON_PRIMARY, $buttonattrs)] :
                 []);
         return $OUTPUT->render($enrolpage);
+    }
+
+    /**
+     * Gets or creates a manual enrolment instance for a course.
+     *
+     * @param int $courseid The course ID.
+     * @return stdClass|null The enrolment instance, or null on failure.
+     */
+    private function get_or_create_manual_enrol_instance($courseid) {
+        global $DB;
+
+        $manualenrol = enrol_get_plugin('manual');
+        if (!$manualenrol) {
+            return null;
+        }
+
+        if ($instance = $DB->get_record('enrol', ['enrol' => 'manual', 'courseid' => $courseid], '*', IGNORE_MISSING)) {
+            if ($instance->status == ENROL_INSTANCE_DISABLED) {
+                // It's disabled, so enable it.
+                $instance->status = ENROL_INSTANCE_ENABLED;
+                $DB->update_record('enrol', $instance);
+            }
+            return $instance;
+        } else {
+            // It doesn't exist, so create it.
+            if ($course = $DB->get_record('course', ['id' => $courseid])) {
+                $instanceid = $manualenrol->add_default_instance($course);
+                if ($instanceid) {
+                    return $DB->get_record('enrol', ['id' => $instanceid]);
+                }
+            }
+        }
+
+        return null;
     }
 
     private function record_token($userid, $token) {
@@ -904,6 +976,7 @@ class enrol_token_plugin extends enrol_plugin
             $button->class .= ' enrol_manual_plugin';
 
             return [$button];
+            // return [null,$button]; // sUChgCguv
         }
     }
 
