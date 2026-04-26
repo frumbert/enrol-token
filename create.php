@@ -118,8 +118,12 @@ if (($data = $form->get_data()) === null) {
 		$cohortid = $data->cohortexisting;
 	}
 
+	if ($cohortid == 0) {
+		$cohortid = null;
+	}
+
 	// store the tokens in the database (transacted)
-	enrol_token_manager_insert_tokens($cohortid, $course->id, $tokens, $data->seatspertoken, $data->expirydate);
+	enrol_token_manager_insert_tokens($cohortid, $course->id, $tokens, $data->seatspertoken, $data->expirydate, 0, $data->notes);
 
 	// construct a summary of this action to send
 	$data->coursename = $course->fullname;

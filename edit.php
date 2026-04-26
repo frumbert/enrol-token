@@ -96,6 +96,10 @@ else if ($data = $mform->get_data()) {
         $data->customint6 = $instance->customint6;
     }
 
+    if (is_array($data->customtext2)) {
+      $data->customtext2 = implode(',', $data->customtext2);
+    }
+
     if ($instance->id) {
         $reset = ($instance->status != $data->status);
 
@@ -107,6 +111,7 @@ else if ($data = $mform->get_data()) {
         $instance->customint4 = $data->customint4;
         $instance->customint6 = $data->customint6;
         $instance->customtext1 = $data->customtext1;
+        $instance->customtext2 = $data->customtext2;
         $instance->roleid = $data->roleid;
         $instance->enrolperiod = $data->enrolperiod;
         $instance->expirynotify = $data->expirynotify;
@@ -122,7 +127,22 @@ else if ($data = $mform->get_data()) {
         }
     }
     else {
-        $fields = array('status' => $data->status, 'name' => $data->name, 'customint1' => $data->ipthrottlingperiod, 'customint2' => $data->customint2, 'customint3' => $data->userthrottlingperiod, 'customint4' => $data->customint4, 'customint6' => $data->customint6, 'customtext1' => $data->customtext1, 'roleid' => $data->roleid, 'enrolperiod' => $data->enrolperiod, 'expirynotify' => $data->expirynotify, 'notifyall' => $data->notifyall, 'expirythreshold' => $data->expirythreshold, 'enrolstartdate' => $data->enrolstartdate, 'enrolenddate' => $data->enrolenddate);
+        $fields = array('status' => $data->status,
+          'name' => $data->name,
+          'customint1' => $data->ipthrottlingperiod,
+          'customint2' => $data->customint2,
+          'customint3' => $data->userthrottlingperiod,
+          'customint4' => $data->customint4,
+          'customint6' => $data->customint6,
+          'customtext1' => $data->customtext1,
+          'customtext2' => $data->customtext2,
+          'roleid' => $data->roleid,
+          'enrolperiod' => $data->enrolperiod,
+          'expirynotify' => $data->expirynotify,
+          'notifyall' => $data->notifyall,
+          'expirythreshold' => $data->expirythreshold,
+          'enrolstartdate' => $data->enrolstartdate,
+          'enrolenddate' => $data->enrolenddate);
         $plugin->add_instance($course, $fields);
     }
 

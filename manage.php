@@ -217,6 +217,7 @@ if ($editing) {
 			$table->head = [
 				get_string('manage_token_header_token','enrol_token'),
 				get_string('manage_token_header_cohort','enrol_token'),
+				get_string('manage_token_header_notes','enrol_token'),
 				get_string('manage_token_header_seatsremaining','enrol_token'),
 				get_string('manage_token_header_createdby','enrol_token'),
 				get_string('manage_token_header_datecreated','enrol_token'),
@@ -275,6 +276,7 @@ if ($editing) {
 				$rows[] = [
 					$record->token,
 					$cohort,
+          $record->notes,
 					get_string('manage_token_aofb','enrol_token', (object)["a" => $record->remaining, "b" => $record->total]),
 					$usercreated,
 					$datecreated,

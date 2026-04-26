@@ -166,6 +166,10 @@ $string['create_token_email_body_default'] = "<p>Hello,</p>
 <p>Regards,<br />
 {adminsignoff}</p>";
 
+$string['alsoenrolinto'] = 'Also enrol into';
+$string['alsoenrolinto_help'] = 'You can select one or more other courses that the user will be enrolled into (uses manual enrolment; creates it if required during enrolment)';
+
+
 $string['create_token_result_header'] = 'Here are your tokens';
 
 $string['admin_token_report'] = 'Token report';
@@ -173,6 +177,7 @@ $string['admin_token_report_detail'] = 'Open a report showing all tokens and the
 
 $string['manage_token_header_token'] = 'Token';
 $string['manage_token_header_cohort'] = 'Cohort';
+$string['manage_token_header_notes'] = 'Notes';
 $string['manage_token_header_seatsremaining'] = 'Seats remaining';
 $string['manage_token_header_createdby'] = 'Created by';
 $string['manage_token_header_datecreated'] = 'Date created';
