@@ -51,6 +51,8 @@ export function initEnrol(instanceId) {
             });
 
             // Redirect to the course page when the form is submitted.
+            // event.detail should be the value returned by enrol_form::process_dynamic_submission(...)
+            // which should be /course/view.php?id=X
             modalForm.addEventListener(modalForm.events.FORM_SUBMITTED, event => {
                 window.location.href = event.detail ? event.detail :
                     Url.relativeUrl('/course/view.php', {id: button.dataset.id});
