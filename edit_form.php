@@ -62,9 +62,33 @@ class enrol_token_edit_form extends moodleform
         $mform->addHelpButton('customint6', 'newenrols', 'enrol_token');
         $mform->disabledIf('customint6', 'status', 'eq', ENROL_INSTANCE_DISABLED);
 
-        $roles = $this->extend_assignable_roles($context, $instance->roleid, 5);
+        $roles = $this->extend_assignable_roles($context, $instance->roleid);
         $mform->setDefault('roleid', 0);
         $mform->addElement('select', 'roleid', get_string('role', 'enrol_token'), $roles);
+
+        $courses = get_courses('all', 'c.sortorder ASC', 'c.id,c.fullname,c.category');
+        $courseoptions = [];
+        $courseoptionscount = 0;
+        $categories = core_course_category::get_all();
+
+        foreach ($courses as $course) {
+            if ($course->id == $instance->courseid) {
+                continue;
+            }
+            if (isset($categories[$course->category])) {
+                if (!isset($courseoptions[$categories[$course->category]->name])) {
+                    $courseoptions[$categories[$course->category]->name] = [];
+                    $courseoptionscount++;
+                }
+                $courseoptions[$categories[$course->category]->name][$course->id] = $course->fullname;
+                $courseoptionscount++;
+            }
+        }
+        $sizemax = min(9, $courseoptionscount);
+
+        $mform->addElement('selectgroups', 'customtext2', get_string('alsoenrolinto', 'enrol_token'), $courseoptions, ['multiple' => 'multiple', 'size' => $sizemax]);
+        $mform->addHelpButton('customtext2', 'alsoenrolinto', 'enrol_token');
+        $mform->setType('customtext2', PARAM_TEXT);
 
         $mform->addElement('duration', 'enrolperiod', get_string('enrolperiod', 'enrol_token'), array('optional' => true, 'defaultunit' => 86400));
         $mform->addHelpButton('enrolperiod', 'enrolperiod', 'enrol_token');
