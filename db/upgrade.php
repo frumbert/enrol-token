@@ -50,13 +50,54 @@ function xmldb_enrol_token_upgrade($oldversion) {
     if ($oldversion < 2026042300) {
 
         $table = new xmldb_table('enrol_token_tokens');
-        $field = new xmldb_field('outnotesput', XMLDB_TYPE_TEXT, null, null, XMLDB_NOTNULL, null, null, 'timeexpire');
+        $field = new xmldb_field('notes', XMLDB_TYPE_TEXT, null, null, null, null, null, 'timeexpire');
 
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
 
         upgrade_plugin_savepoint(true, 2026042300, 'enrol', 'token');
+    }
+
+    if ($oldversion < 2026051800) {
+
+        $table = new xmldb_table('enrol_token_tokens');
+        $index = new xmldb_index('cohortid-courseid', XMLDB_INDEX_NOTUNIQUE, array('cohortid', 'courseid'));
+
+        $field = new xmldb_field('notes', XMLDB_TYPE_TEXT, null, null, null, null, null, 'timeexpire');
+
+        if ($dbman->field_exists($table, $field)) {
+            $dbman->change_field_notnull($table, $field);
+        }
+
+        $field = new xmldb_field('cohortid', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'id');
+
+        if ($dbman->field_exists($table, $field)) {
+            if ($dbman->index_exists($table, $index)) {
+                $dbman->drop_index($table, $index);
+            }
+
+            $dbman->change_field_notnull($table, $field);
+            $dbman->change_field_default($table, $field);
+
+            if (!$dbman->index_exists($table, $index)) {
+                $dbman->add_index($table, $index);
+            }
+        }
+
+        upgrade_plugin_savepoint(true, 2026051800, 'enrol', 'token');
+    }
+
+    if ($oldversion < 2026051801) {
+
+        $table = new xmldb_table('enrol_token_tokens');
+        $field = new xmldb_field('enrolid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'courseid');
+
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_plugin_savepoint(true, 2026051801, 'enrol', 'token');
     }
 
     return true;

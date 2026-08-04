@@ -143,11 +143,20 @@ class modify_token_form extends moodleform {
         $mform->addHelpButton('available', 'create_token_seats', 'enrol_token');
         $mform->setDefault('available', $instance['remaining']);
         $mform->setType('available', PARAM_INT);
-        $mform->addRule('available', 'Enter a number between 1 and 1000', 'regex', '/^0*(?:[1-9][0-9][0-9]?|[1-9]|1000)$/', 'client', false, false );
+        $mform->addRule('available', 'Enter a number between 0 and 1000', 'regex', '/^(?:1000|[1-9]\d{0,2}|0)$/', 'client', false, false );
 
         // time expires
         $mform->addElement('date_time_selector', 'expires', get_string('manage_token_action_expires', 'enrol_token'), array('optional' => true));
         $mform->setDefault('expires', $instance['expires']);
+
+        if (!empty($instance['instanceoptions']) && (int)$instance['tokenenrolid'] === 0) {
+            $mform->addElement('select', 'tokenenrolid', get_string('manage_token_action_instance', 'enrol_token'), $instance['instanceoptions']);
+            $mform->setDefault('tokenenrolid', $instance['enrolid']);
+        } else {
+            $mform->addElement('hidden', 'tokenenrolid');
+            $mform->setType('tokenenrolid', PARAM_INT);
+            $mform->setDefault('tokenenrolid', $instance['tokenenrolid']);
+        }
 
         $mform->addElement('html', '</div>');
 
@@ -216,17 +225,7 @@ class create_enrol_tokens_form extends moodleform
         $cohorts = array();
         $dbcohorts = cohort_get_cohorts($context->id, 0, 100);
         foreach ($dbcohorts['cohorts'] as $dbcohort) $cohorts[$dbcohort->id] = $dbcohort->name;
-
-        // cohort selection
-        $mform->addElement('header', 'cohorts', get_string('create_cohort_header', 'enrol_token'));
-
-        $mform->addElement('static', '', get_string('create_cohort_help', 'enrol_token'), '');
-        $mform->addElement('select', 'cohortexisting', get_string('create_cohort_select', 'enrol_token'), $cohorts);
-        $mform->addElement('static', '', '', 'OR');
-        $mform->addElement('text', 'cohortnew', get_string('create_cohort_new', 'enrol_token'), 'maxlength="253" size="25"');
-        $field =& $mform->getElement('cohortnew');
-        $field->updateAttributes(['placeholder'=>enrol_token_new_cohort_id($COURSE)]);
-        $mform->setType('cohortnew', PARAM_CLEANHTML);
+        $cohorts = [0 => get_string('choose')] + $cohorts;
 
         // token parameters
         $mform->addElement('header', 'tokens', get_string('create_token_header', 'enrol_token'));
@@ -249,6 +248,10 @@ class create_enrol_tokens_form extends moodleform
 
         $mform->addElement('date_selector', 'expirydate', get_string('create_token_expiry', 'enrol_token'), array('optional' => true));
 
+        $mform->addElement('textarea', 'notes', get_string('create_token_notes', 'enrol_token'), 'cols="50" rows="5"');
+        $mform->setType('notes', PARAM_TEXT);
+        $mform->addHelpButton('notes', 'create_token_notes', 'enrol_token');
+
         $mform->addElement('text', 'emailaddress', get_string('create_token_email', 'enrol_token'), 'size="50"');
         $mform->setType('emailaddress', PARAM_EMAIL);
         $mform->setDefault('emailaddress', $USER->email);
@@ -259,6 +262,20 @@ class create_enrol_tokens_form extends moodleform
         $mform->setType('mailbody', PARAM_RAW);
         $mform->addHelpButton('mailbody', 'create_token_email_body', 'enrol_token');
 
+        // cohort selection
+        $mform->addElement('header', 'cohorts', get_string('create_cohort_header', 'enrol_token'));
+
+        $mform->addElement('static', '', get_string('create_cohort_help', 'enrol_token'), '');
+        $mform->addElement('select', 'cohortexisting', get_string('create_cohort_select', 'enrol_token'), $cohorts);
+        $mform->setDefault('cohortexisting', 0);
+        $mform->addElement('static', '', '', 'OR');
+        $mform->addElement('text', 'cohortnew', get_string('create_cohort_new', 'enrol_token'), 'maxlength="253" size="25"');
+        $mform->setType('cohortnew', PARAM_CLEANHTML);
+
+        $mform->addElement('hidden', 'enrolid');
+        $mform->setType('enrolid', PARAM_INT);
+        $mform->setDefault('enrolid', $this->_customdata['enrolid']);
+
         // buttons
         $this->add_action_buttons(true, get_string('create_token_submit', 'enrol_token'));
     }
@@ -266,6 +283,7 @@ class create_enrol_tokens_form extends moodleform
     function definition_after_data() {
         $mform = $this->_form;
         $mform->applyFilter('cohortnew', 'trim');
+        $mform->applyFilter('notes', 'trim');
         $mform->applyFilter('emailaddress', 'trim');
         $mform->applyFilter('prefix', 'trim');
     }
@@ -350,7 +368,7 @@ function enrol_token_manager_create_cohort_id($cohort_name, $cohort_idnumber) {
     return $cohortid;
 }
 
-function enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $places_per_seat, $expirydate, $enrol_days = 0) {
+function enrol_token_manager_insert_tokens($cohort_id, $course_id, $enrolid, $tokens, $places_per_seat, $expirydate, $enrol_days, $notes = '') {
     global $DB, $USER;
     $expiry_date = ($expirydate == 0) ? 0 : ($expirydate + (24 * 60 * 60)); // date specified is inclusive
     if (($transaction = $DB->start_delegated_transaction()) === null) throw new coding_exception('Invalid delegated transaction object');
@@ -360,11 +378,13 @@ function enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $pla
             $tokenRec->id = $token;
             $tokenRec->cohortid = $cohort_id;
             $tokenRec->courseid = $course_id;
+            $tokenRec->enrolid = $enrolid;
             $tokenRec->numseats = $places_per_seat;
             $tokenRec->seatsavailable = $places_per_seat;
             $tokenRec->createdby = $USER->id;
             $tokenRec->timecreated = time();
             $tokenRec->timeexpire = $expiry_date;
+            $tokenRec->notes = $notes;
             if ($DB->insert_record_raw('enrol_token_tokens', $tokenRec, false, false, true) === false) throw new Exception('enrol_token_manager: token storage failed');
         }
         $transaction->allow_commit();
@@ -389,7 +409,7 @@ function enrol_token_manager_create_tokens_external($course_idnumber, $num_seats
     $tokens = enrol_token_manager_generate_token_data($num_seats, $prefix);
 
     // save them into the database
-    enrol_token_manager_insert_tokens($cohort_id, $course_id, $tokens, $places_per_seat, $expirydate );
+    enrol_token_manager_insert_tokens($cohort_id, $course_id, 0, $tokens, $places_per_seat, $expirydate, 0);
 
     // return the tokens
     return $tokens;
@@ -397,7 +417,7 @@ function enrol_token_manager_create_tokens_external($course_idnumber, $num_seats
 
 /**
  * Finds one or more tokens and their usage details based on a filter
- * @param int $istance Enrolment instance 
+ * @param int $istance Enrolment instance
  * @param string $filter like query to search for
  * @param boolean $include_row whether to populate a row-number column
  * @return $DB rows
@@ -413,6 +433,10 @@ function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row 
     $operand = $courseid>0?'=':'>';
     $query = ["t.courseid {$operand} ?"];
     $params = [$courseid];
+    if (isset($instance->id)) {
+        $query[] = '(t.enrolid = ? OR t.enrolid = 0)';
+        $params[] = (int)$instance->id;
+    }
     if ($filter != '') {
         $query[] = 't.id LIKE ?';
         $params[] = str_replace(['*', '?'], ['%', '_'], $filter);
@@ -424,18 +448,21 @@ function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row 
     $fields = '
             t.id token,
             t.courseid,
+            t.enrolid,
             h.name cohort,
             h.id cohortid,
             t.numseats total,
             t.seatsavailable remaining,
             t.createdby createdby,
             t.timecreated created,
-            t.timeexpire expires
+            t.timeexpire expires,
+            t.notes
     ';
+
             // l.`userid` usedby,
             // l.`timecreated` timeused ';
     $from = '{cohort} h
-        inner join {enrol_token_tokens} t on t.`cohortid` = h.`id`
+        right join {enrol_token_tokens} t on t.`cohortid` = h.`id`
     ';
         // left outer join {enrol_token_log} l on t.id = l.`token`
     $order = 't.timecreated desc';
@@ -455,6 +482,16 @@ function enrol_token_manager_find_tokens($instance, $filter = '*', $include_row 
     $sql = "SELECT {$fields} FROM {$from} {$where} ORDER BY {$order}";
     // var_dump($sql,$params);
     return $DB->get_records_sql($sql, $params);
+}
+
+function enrol_token_manager_get_instance_options($courseid) {
+    $options = [];
+    foreach (enrol_get_instances($courseid, true) as $instance) {
+        if ((isset($instance->enrol) === true) && ($instance->enrol === 'token')) {
+            $options[$instance->id] = enrol_get_plugin('token')->get_instance_name($instance);
+        }
+    }
+    return $options;
 }
 
 function enrol_token_get_token_users($token,$courseid) {
@@ -483,7 +520,7 @@ function enrol_token_get_token_user_list_render($list,$courseid) {
 
 function enrol_token_get_token_users_list($token,$courseid) {
     $list = enrol_token_get_token_users($token,$courseid);
-    return enrol_token_get_token_user_list_render($list,$courseid);  
+    return enrol_token_get_token_user_list_render($list,$courseid);
 }
 
 // format the data for the report
@@ -496,11 +533,13 @@ function enrol_token_format_data_for_report($data) {
         $row[] = ($DB->get_record('course', array('id' => $data->courseid))->fullname);
         $row[] = $data->token;
         $row[] = $data->cohort;
+        $row[] = $data->notes;
         $row[] = fullname(\core_user::get_user($data->createdby));
         $row[] = $data->total;
         $row[] = $data->remaining;
         $row[] = userdate($data->created);
         $row[] = (intval($data->expires) > 0) ? userdate($data->expires) : '';
+        $row[] = intval($data->days);
         if (is_null($userid)) {
             $row[] = '';
             $row[] = '';
@@ -516,6 +555,7 @@ function enrol_token_format_data_for_report($data) {
         get_string('course'),
         get_string('manage_token_header_token','enrol_token'),
         get_string('manage_token_header_cohort','enrol_token'),
+        get_string('manage_token_header_notes','enrol_token'),
         get_string('manage_token_header_createdby','enrol_token'),
         get_string('manage_token_action_seats','enrol_token'),
         get_string('manage_token_action_remaining','enrol_token'),
@@ -539,6 +579,7 @@ function enrol_token_format_data_for_report($data) {
         '',
         count(array_unique(array_column($results->rows, 1))), // total tokens
         count(array_unique(array_column($results->rows, 2))), // total cohorts
+        '',
         count(array_unique(array_column($results->rows, 3))), // total creators
         array_sum(array_column($results->rows,4)), // total seats
         array_sum(array_column($results->rows,5)), // total remaining

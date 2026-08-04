@@ -87,7 +87,7 @@ navigation_node::override_active_url(new moodle_url('/user/index.php', array('id
 
 // initialise the form using the enrolid so it works after postback
 $url = new moodle_url('/enrol/token/create.php', ['enrolid' => $enrolid]);
-$form = new create_enrol_tokens_form($url, ["instancename" => $instancename]);
+$form = new create_enrol_tokens_form($url, ["instancename" => $instancename, "enrolid" => $enrolid]);
 
 if ($form->is_cancelled()) {
 	$url = new moodle_url('/enrol/instances.php', ['id' => $course->id]);
@@ -123,7 +123,7 @@ if (($data = $form->get_data()) === null) {
 	}
 
 	// store the tokens in the database (transacted)
-	enrol_token_manager_insert_tokens($cohortid, $course->id, $tokens, $data->seatspertoken, $data->expirydate, 0, $data->notes);
+	enrol_token_manager_insert_tokens($cohortid, $course->id, $data->enrolid, $tokens, $data->seatspertoken, $data->expirydate, 0, $data->notes);
 
 	// construct a summary of this action to send
 	$data->coursename = $course->fullname;

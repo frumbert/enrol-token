@@ -99,10 +99,12 @@ $form = new view_enrol_token_usage_form($url);
 
 if ($editing) {
 	$form->set_data(['token' => $token]);
-	$token_row = $DB->get_record('enrol_token_tokens', array('id'=>$token), '*', MUST_EXIST);
+	$token_row = $DB->get_record_select('enrol_token_tokens', 'id = ? AND courseid = ? AND (enrolid = ? OR enrolid = 0)', [$token, $course->id, $enrolid], '*', MUST_EXIST);
 	$editform = new modify_token_form(null, [
 		'enrolid'=>$enrolid,
 		'token'=>$token,
+		'tokenenrolid'=>(int)$token_row->enrolid,
+		'instanceoptions'=>enrol_token_manager_get_instance_options($course->id),
 		'seats'=>$token_row->numseats,
 		'remaining'=>$token_row->seatsavailable,
 		'expires'=>$token_row->timeexpire,
@@ -117,6 +119,7 @@ if ($editing) {
 		$token_row->numseats = $data->seats;
 		$token_row->seatsavailable = $data->available;
 		$token_row->timeexpire = $data->expires ?: 0;
+		$token_row->enrolid = $data->tokenenrolid;
 		//var_dump($data,$token_row);exit;
 		$DB->update_record('enrol_token_tokens', $token_row);
 		$editing = false;
@@ -243,8 +246,12 @@ if ($editing) {
 
 				// var_dump($record);
 
-				$url = new \moodle_url('/cohort/assign.php', array('id' => $record->cohortid, 'returnurl' => '%2Fcohort%2Findex.php%3Fpage%3D0'));
-				$cohort = \html_writer::link($url, $record->cohort);
+				if (!empty($record->cohortid)) {
+					$url = new \moodle_url('/cohort/assign.php', array('id' => $record->cohortid, 'returnurl' => '%2Fcohort%2Findex.php%3Fpage%3D0'));
+					$cohort = \html_writer::link($url, $record->cohort);
+				} else {
+					$cohort = '';
+				}
 
 				$rec = $DB->get_record('user', array('id' => $record->createdby));
 				$url = new \moodle_url('/user/view.php', array('id' => $record->createdby, 'course' => $course->id));

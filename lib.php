@@ -189,8 +189,8 @@ class enrol_token_plugin extends enrol_plugin
     // returns: a string containing the error message, or empty.
     public static function getTokenValidationErrors($value) {
         global $DB;
-        if ($row = $DB->get_record('enrol_token_tokens', array('id' => $value), 'courseid, seatsavailable, numseats, timeexpire')) {
-            $inst = self::getInstanceDataForCourse($row->courseid); // is static
+        if ($row = $DB->get_record('enrol_token_tokens', array('id' => $value), 'courseid, enrolid, seatsavailable, numseats, timeexpire')) {
+            $inst = self::getInstanceDataForCourse($row->courseid, $row->enrolid); // is static
             if (!$inst) {
                 return 'Token enrolment is not yet set up for this course';
                  // that's a showstopper, for sure
@@ -285,10 +285,16 @@ class enrol_token_plugin extends enrol_plugin
     }
 
     // returns token enrolment instance data for a given course
-    protected static function getInstanceDataForCourse($courseId) {
+    protected static function getInstanceDataForCourse($courseId, $instanceId = 0) {
 
         // get all enrol plugins available for course
         $enrolinstances = enrol_get_instances($courseId, true);
+        foreach ($enrolinstances as $instance) {
+            if ((isset($instance->enrol) === true) && ($instance->enrol == 'token') && (!empty($instanceId)) && ((int)$instance->id === (int)$instanceId)) {
+                return $instance;
+            }
+        }
+
         foreach ($enrolinstances as $instance) {
             if ((isset($instance->enrol) === true) && ($instance->enrol == 'token')) {
                 return $instance;
@@ -322,10 +328,10 @@ class enrol_token_plugin extends enrol_plugin
         global $DB, $USER, $SESSION, $CFG;
 
         // get token record
-        $tokenRec = $DB->get_record('enrol_token_tokens', array('id' => $tokenValue), 'courseid,seatsavailable,timeexpire,cohortid');
+        $tokenRec = $DB->get_record('enrol_token_tokens', array('id' => $tokenValue), 'courseid,enrolid,seatsavailable,timeexpire,cohortid');
 
         // use default plugin values for instance data if no token record available (required for throttling values)
-        $settings = ($tokenRec === false) ? $this->getDefaultValuesAsObject() : $this->getInstanceDataForCourse($tokenRec->courseid);
+        $settings = ($tokenRec === false) ? $this->getDefaultValuesAsObject() : $this->getInstanceDataForCourse($tokenRec->courseid, $tokenRec->enrolid);
 
         // map crappy customint field names to descriptive field names
         if (isset($settings->ipthrottlingperiod) === false) $settings->ipthrottlingperiod = $settings->customint1;
@@ -457,10 +463,10 @@ class enrol_token_plugin extends enrol_plugin
         global $DB;
 
         // set up objects we require
-        $tokenRec = $DB->get_record('enrol_token_tokens', array('id' => $token), 'courseid,seatsavailable,timeexpire,cohortid');
+        $tokenRec = $DB->get_record('enrol_token_tokens', array('id' => $token), 'courseid,enrolid,seatsavailable,timeexpire,cohortid');
         $courseId = $tokenRec->courseid;
 
-        $settings = ($tokenRec === false) ? $this->getDefaultValuesAsObject() : $this->getInstanceDataForCourse($courseId);
+        $settings = ($tokenRec === false) ? $this->getDefaultValuesAsObject() : $this->getInstanceDataForCourse($courseId, $tokenRec->enrolid);
         $cohortid = $tokenRec->cohortid;
 
         // user already enrolled in course? return SUCCESS

@@ -116,7 +116,7 @@ $string['create_token'] = 'Create tokens';
 $string['create_token_submit'] = 'Create';
 $string['create_token_tokens'] = 'Tokens';
 
-$string['create_cohort_header'] = 'Cohort selection';
+$string['create_cohort_header'] = 'Cohort selection (optional)';
 $string['create_cohort_help'] = 'Users who enrol using a token will be added to a Cohort. Choose an existing cohort OR create a new cohort by specifying a name.';
 $string['create_cohort_select'] = 'Existing Cohort';
 $string['create_cohort_or'] = 'OR';
@@ -129,11 +129,13 @@ $string['create_token_prefix'] = 'Prefix';
 $string['create_token_prefix_help'] = 'Generated tokens will begin with the text you enter here (default: blank, no spaces, up to 8 letters).';
 
 $string['create_token_seats'] = 'Enrolments per token';
-$string['create_token_seats_help'] = 'How many times each token can be used for an enrolment (between 1 and 1000)';
+$string['create_token_seats_help'] = 'How many times each token can be used for an enrolment (between 1 and 1000). If set to zero the token can no longer be used.';
 $string['create_token_count'] = 'Number of tokens to produce';
 $string['create_token_count_help'] = 'Enter the number of tokens you want to generate using these details (between 1 and 1000)';
 
 $string['create_token_email'] = 'Send tokens to this email';
+$string['create_token_notes'] = 'Notes';
+$string['create_token_notes_help'] = 'Shown on reports. Use to track reason for creating token, etc';
 
 $string['create_token_email_subject'] = 'Mail subject';
 $string['create_token_email_subject_default'] = 'Your enrolment tokens for {$a->instancename}';
@@ -193,10 +195,11 @@ $string['manage_token_action_edit'] = 'Edit';
 $string['manage_token_action_seats'] = 'Seats available';
 $string['manage_token_action_remaining'] = 'Seats remaining';
 $string['manage_token_action_expires'] = 'Expiry date';
+$string['manage_token_action_instance'] = 'Enrolment instance';
 
 $string['seatslessthanavailable'] = 'The number of seats remaining is greater than the number of seats available';
 $string['seatsoutofrange'] = 'Seats must be between 1 and {$a}';
-$string['tokensoutofrange'] = 'The number of tokens you entered must be between 1 and {$a} and must be equal or less than the number of seats available';
+$string['tokensoutofrange'] = 'The number of tokens you entered must be between 0 and {$a} and must be equal or less than the number of seats available';
 $string['expirydateinvalid'] = 'The expiry date must be in the future';
 
 $string['token_value'] = 'Token: {$a}';
